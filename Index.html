@@ -1,0 +1,221 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CRYSTAL EDGE</title>
+<style>
+:root{color-scheme:dark;--bg:#080d18;--panel:#101a2a;--line:#24344b;--text:#edf4ff;--muted:#8da1bd;--blue:#60a5fa;--green:#34d399;--red:#fb7185}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,Arial,sans-serif}
+header{position:sticky;top:0;background:#080d18f2;border-bottom:1px solid var(--line);padding:15px;z-index:2}
+.brand{font-size:20px;font-weight:850;letter-spacing:1.4px}.brand span{color:var(--blue)}
+.sub{font-size:11px;color:var(--muted);margin-top:4px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+button,input,select{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+button{cursor:pointer}
+main{max-width:1000px;margin:auto;padding:13px}
+.status{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.stat,.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px}
+.stat small{display:block;color:var(--muted);font-size:10px;margin-bottom:6px}
+.stat strong{font-size:13px;overflow-wrap:anywhere}
+.controls{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+.controls input{flex:1;min-width:150px}
+.sports button.active{border-color:var(--blue);color:var(--blue)}
+.note{color:var(--muted);font-size:11px;line-height:1.5;margin:10px 2px}
+#matches{display:grid;gap:10px}
+.card h3{font-size:15px;margin:0 0 8px;line-height:1.4}
+.meta{font-size:11px;color:var(--muted);margin-bottom:10px}
+.odds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.price{border:1px solid var(--line);border-radius:9px;padding:9px 5px;text-align:center;min-width:0}
+.price small{display:block;color:var(--muted);font-size:10px;margin-bottom:6px}
+.price b{font-size:14px;overflow-wrap:anywhere}
+.buy{color:var(--green)}.sell{color:var(--red)}
+.market{border-top:1px solid var(--line);margin-top:10px;padding-top:9px}
+.market summary{color:var(--blue);cursor:pointer}
+.market p{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.empty{padding:25px 14px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}
+footer{text-align:center;padding:25px;color:var(--muted);font-size:11px}
+@media(max-width:380px){main{padding:9px}.stat{padding:9px}.price b{font-size:12px}.price{padding:8px 2px}}
+</style>
+</head>
+<body>
+<header>
+ <div class="top">
+  <div><div class="brand"><span>◇</span> CRYSTAL EDGE</div>
+  <div class="sub">POLYMARKET · LIVE SPORTS</div></div>
+  <button id="refresh">↻ Refresh</button>
+ </div>
+</header>
+<main>
+ <div class="status">
+  <div class="stat"><small>REST API</small><strong id="rest">WAITING</strong></div>
+  <div class="stat"><small>WEBSOCKET</small><strong id="ws">CONNECTING</strong></div>
+  <div class="stat"><small>LAST PACKET</small><strong id="age">—</strong></div>
+  <div class="stat"><small>REST TIME</small><strong id="latency">—</strong></div>
+  <div class="stat"><small>EVENTS</small><strong id="count">0</strong></div>
+  <div class="stat"><small>WS MESSAGES</small><strong id="messages">0</strong></div>
+ </div>
+ <div class="controls sports" id="sports">
+  <button class="active" data-sport="cricket">Cricket</button>
+  <button data-sport="tennis">Tennis</button>
+  <button data-sport="football">Football</button>
+ </div>
+ <div class="controls">
+  <input id="search" placeholder="Search team / player / match">
+  <select id="period">
+   <option value="all">All upcoming</option>
+   <option value="today">Today</option>
+   <option value="live">Live now*</option>
+  </select>
+ </div>
+ <p class="note">Polymarket only. REST and WebSocket are two data feeds from the same exchange, not independent bookmakers. BACK/LAY are indicative bid/ask equivalents; BUY/SELL are the exchange-side labels. Missing quotes show —. *Live status depends on available event metadata.</p>
+ <div id="matches"><div class="empty">Set up your new Worker URL to load Polymarket events.</div></div>
+</main>
+<footer>CRYSTAL EDGE · Real data only · No simulated odds</footer>
+<script>
+/*
+  IMPORTANT:
+  Replace this with your NEW Worker URL.
+  Do not put your old Worker URL here.
+*/
+const WORKER_URL = "PASTE_YOUR_NEW_WORKER_URL_HERE";
+const WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
+const SPORTS = ["cricket","tennis","football"];
+let sport="cricket", events=[], socket=null, packetAt=0, wsMessages=0;
+let tokenIds=new Set(), books={}, wsReady=false, reconnects=0, reconnectTimer=null;
+const $=id=>document.getElementById(id);
+const clean=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num=v=>{const n=Number(v);return Number.isFinite(n)&&n>0?n:null};
+const decimal=p=>{p=num(p);return p&&p<1?(1/p).toFixed(2):"—"};
+function matchesSport(e){
+ const t=((e.title||e.name||"")+" "+(e.slug||"")+" "+(e.description||"")).toLowerCase();
+ if(!SPORTS.some(s=>t.includes(s)))return false;
+ if(/bitcoin|ethereum|election|president|fomc|inflation|stock|nasdaq|s&p 500|ballon d.or|champion outright|winner of the league/i.test(t))return false;
+ return / vs\.? | versus | v\. | v-|match|game|final|quarterfinal|semi-final|round of|test match|t20|odi/i.test(" "+t+" ");
+}
+function getMarkets(e){return Array.isArray(e.markets)?e.markets:[]}
+function getTokens(m){
+ let ids=m.clobTokenIds??m.clob_token_ids;
+ if(typeof ids==="string"){try{ids=JSON.parse(ids)}catch{ids=[]}}
+ if(!Array.isArray(ids))ids=[];
+ return ids.map(x=>typeof x==="string"?x:(x?.token_id||x?.tokenId)).filter(Boolean);
+}
+function getOutcomes(m){
+ let o=m.outcomes;
+ if(typeof o==="string"){try{o=JSON.parse(o)}catch{o=[]}}
+ return Array.isArray(o)?o:[];
+}
+function activeEvent(e){
+ if(e.closed===true||e.active===false)return false;
+ return true;
+}
+async function loadEvents(){
+ if(!WORKER_URL.startsWith("https://")){$("rest").textContent="SET WORKER URL";return}
+ const started=performance.now();$("rest").textContent="LOADING";
+ try{
+  const r=await fetch(WORKER_URL+"/events?limit=100&offset=0",{cache:"no-store"});
+  if(!r.ok)throw Error("HTTP "+r.status);
+  const body=await r.json();
+  const list=Array.isArray(body)?body:(body.data||body.events||[]);
+  events=list.filter(e=>activeEvent(e)&&matchesSport(e));
+  $("latency").textContent=Math.round(performance.now()-started)+" ms";
+  $("rest").textContent="CONNECTED";
+  $("count").textContent=events.length;
+  render(); setupSocket();
+ }catch(e){$("rest").textContent="ERROR";$("matches").innerHTML='<div class="empty">Could not load events. Check your Worker URL and /events endpoint.</div>'}
+}
+function quote(token,side){
+ const b=books[token];if(!b)return null;
+ const v=side==="BUY"?(b.bestAsk??b.ask):(b.bestBid??b.bid);
+ return num(v);
+}
+function priceBox(label,v,cls=""){
+ return '<div class="price"><small>'+label+'</small><b class="'+cls+'">'+decimal(v)+'</b></div>';
+}
+function render(){
+ const q=$("search").value.trim().toLowerCase(),period=$("period").value;
+ const now=Date.now();
+ const list=events.filter(e=>{
+  const text=((e.title||e.name||"")+" "+(e.slug||"")).toLowerCase();
+  if(q&&!text.includes(q))return false;
+  const d=Date.parse(e.startDate||e.start_date||e.gameStartTime||"");
+  if(period==="today"&&(!Number.isFinite(d)||new Date(d).toDateString()!==new Date().toDateString()))return false;
+  if(period==="live"&&(!Number.isFinite(d)||d>now||now-d>5*60*60*1000))return false;
+  return true;
+ });
+ $("count").textContent=list.length;
+ if(!list.length){$("matches").innerHTML='<div class="empty">No matching events in the current REST response. The Worker may need sport filtering and pagination.</div>';return}
+ $("matches").innerHTML=list.map((e,i)=>{
+  const ms=getMarkets(e);
+  const title=e.title||e.name||"Match";
+  const date=e.startDate||e.start_date||"";
+  const ids=ms.flatMap(getTokens);
+  const m=ms.find(x=>getTokens(x).length>=2);
+  const ts=m?getTokens(m):[];
+  const o=m?getOutcomes(m):[];
+  const titleA=o[0]||"Outcome 1",titleB=o[1]||"Outcome 2";
+  const a=ts[0],b=ts[1];
+  const aBuy=a?quote(a,"BUY"):null,aSell=a?quote(a,"SELL"):null;
+  const bBuy=b?quote(b,"BUY"):null,bSell=b?quote(b,"SELL"):null;
+  const detail=ms.slice(0,15).map(x=>{
+   const name=x.question||x.groupItemTitle||x.slug||"Market";
+   return '<p>'+clean(name)+' · '+(x.active===false?"Inactive":"Market metadata available")+'</p>';
+  }).join("");
+  return '<article class="card"><h3>'+clean(title)+'</h3><div class="meta">'+clean(date)+' · '+ms.length+' markets</div>'+
+   '<div class="odds">'+priceBox("BUY · "+titleA,aBuy,"buy")+priceBox("SELL · "+titleA,aSell,"sell")+priceBox("BUY · "+titleB,bBuy,"buy")+priceBox("SELL · "+titleB,bSell,"sell")+'</div>'+
+   '<div class="market"><details><summary>All markets ('+ms.length+')</summary>'+detail+'</details></div>'+
+   '<div class="meta">REST snapshot vs WS book · quotes shown only when received</div></article>';
+ }).join("");
+}
+function setupSocket(){
+ const ids=[...new Set(events.flatMap(getMarkets).flatMap(getTokens))].slice(0,500);
+ const next=new Set(ids);
+ if(socket&&ids.length===tokenIds.size&&ids.every(x=>tokenIds.has(x)))return;
+ tokenIds=next;
+ if(socket){try{socket.onclose=null;socket.close()}catch{}}
+ if(!ids.length){$("ws").textContent="NO TOKENS";return}
+ try{
+  socket=new WebSocket(WS_URL);
+  socket.onopen=()=>{
+   wsReady=true;$("ws").textContent="CONNECTED";
+   socket.send(JSON.stringify({type:"market",assets_ids:ids}));
+  };
+  socket.onmessage=ev=>{
+   packetAt=Date.now();wsMessages++;$("age").textContent="0 s";$("messages").textContent=wsMessages;
+   try{const d=JSON.parse(ev.data);const arr=Array.isArray(d)?d:[d];let changed=false;
+    for(const x of arr){
+     const asset=x.asset_id||x.assetId||x.token_id;
+     if(asset){
+      const old=books[asset]||{};
+      if(x.event_type==="price_change"&&Array.isArray(x.price_changes)){
+       for(const p of x.price_changes){const id=p.asset_id;if(!id)continue;books[id]={...(books[id]||{}),bestBid:p.best_bid,bestAsk:p.best_ask};changed=true}
+      }else if(x.event_type==="book"){
+       const bids=x.bids||[],asks=x.asks||[];
+       books[asset]={...old,bestBid:bids.length?Math.max(...bids.map(v=>Number(v.price)||0)):old.bestBid,bestAsk:asks.length?Math.min(...asks.map(v=>Number(v.price)||1)):old.bestAsk};changed=true;
+      }else if(x.best_bid||x.best_ask){
+       books[asset]={...old,bestBid:x.best_bid||old.bestBid,bestAsk:x.best_ask||old.bestAsk};changed=true;
+      }
+     }
+    }
+    if(changed)render();
+   }catch{}
+  };
+  socket.onerror=()=>{$("ws").textContent="ERROR"};
+  socket.onclose=()=>{wsReady=false;$("ws").textContent="DISCONNECTED";reconnects++;clearTimeout(reconnectTimer);reconnectTimer=setTimeout(setupSocket,3000)};
+ }catch{$("ws").textContent="ERROR"}
+}
+$("sports").addEventListener("click",e=>{
+ const b=e.target.closest("button[data-sport]");if(!b)return;
+ sport=b.dataset.sport;
+ document.querySelectorAll("#sports button").forEach(x=>x.classList.toggle("active",x===b));
+ loadEvents();
+});
+$("search").addEventListener("input",render);
+$("period").addEventListener("change",render);
+$("refresh").addEventListener("click",loadEvents);
+setInterval(()=>{if(packetAt)$("age").textContent=Math.floor((Date.now()-packetAt)/1000)+" s";},1000);
+loadEvents();
+setInterval(loadEvents,30000);
+</script>
+</body>
+</html></escape>
