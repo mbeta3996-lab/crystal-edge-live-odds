@@ -1,124 +1,149 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Odds Dashboard – Cricket / Soccer / Tennis</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080d18">
+<title>CRYSTAL EDGE — Live Sports</title>
 <style>
-  body {font-family:Arial,Helvetica,sans-serif; margin:0; padding:0; background:#fafafa;}
-  header {background:#333; color:#fff; padding:0.8rem 1rem; text-align:center; position:relative;}
-  #search {margin:0.5rem 0; padding:0.4rem; width:80%; max-width:400px;}
-  #refresh {margin-left:0.5rem; padding:0.4rem 0.8rem;}
-  #matches {list-style:none; padding:0; margin:0;}
-  #matches li {border-bottom:1px solid #ddd; padding:0.6rem 1rem;}
-  #matches li span {font-weight:bold;}
-
-  /* tiny connection badge – green dot only when WS is open */
-  #connBadge {
-    position:absolute; top:0.5rem; right:0.8rem;
-    display:inline-flex; align-items:center; gap:0.3rem;
-    font-size:0.85rem; color:#fff;
-  }
-  #connBadge .dot {width:8px; height:8px; border-radius:50%; background:#555;}
-  #connBadge.connected .dot {background:#0a0;}   /* green when WS is open */
+:root{color-scheme:dark;--bg:#080d18;--panel:#111d30;--line:#273953;--muted:#8fa4c0;--blue:#48adff;--red:#ff5b78;--green:#42e0ad}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#152b4b,var(--bg) 55%);color:#edf4ff;font:14px -apple-system,BlinkMacSystemFont,sans-serif}
+header{padding:16px;position:sticky;top:0;background:#080d18ed;backdrop-filter:blur(14px);border-bottom:1px solid var(--line);z-index:2}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.logo{font-weight:900;letter-spacing:1.5px;font-size:18px}.logo span{color:var(--blue)}
+.sub{font-size:10px;letter-spacing:1.4px;color:var(--muted);margin-top:3px}
+button,input{font:inherit}
+button{background:#14243a;color:#eaf3ff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer}
+button.active{background:#17436d;border-color:var(--blue)}
+#status{font-size:11px;color:var(--muted);margin-top:12px}
+main{max-width:950px;margin:auto;padding:14px}
+.filters{display:flex;gap:7px;overflow:auto;padding:4px 0 10px}
+.filters button{white-space:nowrap;border-radius:30px;font-size:12px}
+#search{width:100%;background:#0d1728;border:1px solid var(--line);color:white;border-radius:11px;padding:12px;margin:4px 0 12px;outline:none}
+#search:focus{border-color:var(--blue)}
+#summary{color:var(--muted);font-size:11px;margin:4px 2px 12px}
+#matches{display:grid;grid-template-columns:1fr;gap:10px}
+.card{background:linear-gradient(145deg,#142239,#0d1626);border:1px solid var(--line);border-radius:15px;padding:14px;min-width:0}
+.meta{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.match{font-size:16px;font-weight:800;margin:12px 0 5px;overflow-wrap:anywhere}
+.question{font-size:11px;color:var(--muted);margin-bottom:12px}
+.odds{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.odd{border:1px solid;border-radius:11px;padding:10px;min-width:0}
+.buy{border-color:#287db9;background:#102b45}.sell{border-color:#96384e;background:#321824}
+.label{font-size:10px;font-weight:800;letter-spacing:.7px}
+.buy .label{color:var(--blue)}.sell .label{color:var(--red)}
+.price{font-size:23px;font-weight:900;margin:5px 0;font-variant-numeric:tabular-nums}
+.name{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bottom{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:12px;font-size:10px;color:var(--muted)}
+.link{color:#9bd2ff;text-decoration:none}
+.empty{border:1px dashed var(--line);border-radius:14px;padding:25px;text-align:center;color:var(--muted)}
+dialog{width:min(620px,94%);background:#101b2c;color:#edf4ff;border:1px solid var(--line);border-radius:15px}
+dialog::backdrop{background:#000b}
+.detailrow{padding:10px;border:1px solid var(--line);border-radius:10px;margin:8px 0}
+footer{max-width:950px;margin:auto;padding:0 14px 24px;color:var(--muted);font-size:10px}
+@media(min-width:650px){#matches{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body>
 <header>
-  <h1>Live Odds – Cricket / Soccer / Tennis</h1>
-  <div id="connBadge" class="connected">
-    <div class="dot"></div>
-    <span id="statusText">Connecting…</span>
-    <span id="latency">Latency: –</span> |
-    <span id="packetCount">Packets: 0</span>
-  </div>
-  <input id="search" type="text" placeholder="Search team / match…">
-  <button id="refresh">Refresh</button>
+ <div class="top">
+  <div><div class="logo"><span>◇</span> CRYSTAL EDGE</div><div class="sub">POLYMARKET · LIVE SPORTS</div></div>
+  <button id="refresh">↻ Refresh</button>
+ </div>
+ <div id="status">Starting browser worker…</div>
 </header>
+<main>
+ <div class="filters" id="sports">
+  <button class="active" data-sport="all">All Sports</button>
+  <button data-sport="cricket">Cricket</button>
+  <button data-sport="tennis">Tennis</button>
+  <button data-sport="soccer">Football</button>
+  <button data-sport="basketball">Basketball</button>
+ </div>
+ <div class="filters" id="times">
+  <button class="active" data-time="all">All Matches</button>
+  <button data-time="live">Live Now</button>
+  <button data-time="today">Today</button>
+  <button data-time="tomorrow">Tomorrow</button>
+  <button data-time="upcoming">Upcoming</button>
+ </div>
+ <input id="search" type="search" placeholder="Search team, player or match…">
+ <div id="summary">Loading Polymarket events…</div>
+ <section id="matches"><div class="empty">Connecting to public Polymarket data. No demo odds.</div></section>
+</main>
+<footer>Public Polymarket Gamma + CLOB market WebSocket. BUY uses best ask; SELL uses best bid. Decimal odds = 1 / price. Blank quotes mean no live order-book quote was received.</footer>
 
-<ul id="matches"></ul>
+<dialog id="details">
+ <div class="top"><strong id="detailTitle">Markets</strong><button id="closeDetails">Close ✕</button></div>
+ <div id="detailBody"></div>
+</dialog>
 
 <script>
-/* --------------------------------------------------------------
-   Main thread – UI + communication with the worker
-   -------------------------------------------------------------- */
-const worker = new Worker('worker.js');
-
-const badge   = document.getElementById('connBadge');
-const dot     = badge.querySelector('.dot');
-const status  = document.getElementById('statusText');
-const latency = document.getElementById('latency');
-const packets = document.getElementById('packetCount');
-
-let lastLatency = null;   // ms – updated on every fetch‑response
-let packetCount = 0;      // total packets received (incl. filtered)
-
-worker.onmessage = e => {
-  const msg = e.data;
-
-  // ----------------------------------------------------------------
-  // 1️⃣ Odds payload (type = 'odds')
-  // ----------------------------------------------------------------
-  if (msg.type === 'odds') {
-    renderMatches(msg);
-  }
-
-  // ----------------------------------------------------------------
-  // 2️⃣ Stats payload (type = 'stats')
-  // ----------------------------------------------------------------
-  if (msg.type === 'stats') {
-    if (typeof msg.latency === 'number') {
-      lastLatency = msg.latency;
-      latency.textContent = `Latency: ${lastLatency} ms`;
-    }
-    if (typeof msg.packets === 'number') {
-      packetCount = msg.packets;
-      packets.textContent = `Packets: ${packetCount}`;
-    }
-  }
-
-  // ----------------------------------------------------------------
-  // 3️⃣ Connection status (type = 'conn')
-  // ----------------------------------------------------------------
-  if (msg.type === 'conn') {
-    if (msg.connected) {
-      badge.classList.add('connected');
-      status.textContent = 'Connected';
-    } else {
-      badge.classList.remove('connected');
-      status.textContent = 'Disconnected';
-    }
-  }
-};
-
-/* Render the odds list */
-function renderMatches(data) {
-  const ul = document.getElementById('matches');
-  ul.innerHTML = '';
-  if (!data || !data.matches) return;
-  data.matches.forEach(m => {
-    const li = document.createElement('li');
-    li.innerHTML = `
-      <span>${m.home} vs ${m.away}</span>
-      <strong>${m.sport.toUpperCase()}:</strong>
-      ${m.homeOdds} / ${m.awayOdds}
-    `;
-    ul.appendChild(li);
-  });
+'use strict';
+const worker = new Worker('./worker.js');
+const state={matches:[],sport:'all',time:'all',query:'',packets:0,latency:null};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function dec(p){p=Number(p);return Number.isFinite(p)&&p>0&&p<1?(1/p).toFixed(2):'—'}
+function day(d){if(!d)return null;let x=new Date(d);return Number.isNaN(x.getTime())?null:x}
+function sameDay(a,b){return a&&a.toDateString()===b.toDateString()}
+function visible(m){
+ if(state.sport!=='all'&&m.sport!==state.sport)return false;
+ if(state.query&&!m.title.toLowerCase().includes(state.query))return false;
+ const d=day(m.date),now=new Date(),tom=new Date();tom.setDate(now.getDate()+1);
+ if(state.time==='live')return m.live;
+ if(state.time==='today')return sameDay(d,now);
+ if(state.time==='tomorrow')return sameDay(d,tom);
+ if(state.time==='upcoming')return !m.live&&(!d||d>=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1));
+ return true;
 }
-
-/* UI helpers */
-document.getElementById('refresh').onclick = () => worker.postMessage({cmd:'fetch'});
-
-document.getElementById('search').addEventListener('input', () => {
-  const term = this.value.trim().toLowerCase();
-  document.querySelectorAll('#matches li').forEach(li => {
-    const txt = li.textContent.toLowerCase();
-    li.style.display = txt.includes(term) ? '' : 'none';
-  });
-});
-
-/* Kick‑off – ask the worker for the first batch */
-worker.postMessage({cmd:'fetch'});
+function render(){
+ const all=state.matches.filter(visible);
+ $('summary').textContent=`${all.length} matches shown · ${state.matches.length} eligible matches`;
+ if(!all.length){$('matches').innerHTML='<div class="empty">No matching markets right now. Try All Sports / All Matches or refresh.</div>';return}
+ $('matches').innerHTML=all.map(m=>{
+  const q=m.quote||{},a=m.outcomes?.[0]||'Outcome 1';
+  const b=m.outcomes?.[1]||'Outcome 2';
+  const buy=dec(q.ask),sell=dec(q.bid);
+  return `<article class="card">
+   <div class="meta"><span>${esc(m.sport)}</span><span>${m.live?'LIVE':esc(m.dateLabel||'Upcoming')}</span></div>
+   <div class="match">${esc(m.title)}</div>
+   <div class="question">${esc(m.question||'Main outcome market')}</div>
+   <div class="odds">
+    <div class="odd buy"><div class="label">BUY · BEST ASK</div><div class="price">${buy}</div><div class="name">${esc(a)}</div></div>
+    <div class="odd sell"><div class="label">SELL · BEST BID</div><div class="price">${sell}</div><div class="name">${esc(a)}</div></div>
+   </div>
+   <div class="bottom"><span>${q.at?'Quote '+Math.max(0,Math.round((Date.now()-q.at)/1000))+'s ago':'Waiting for quote'}</span><button data-detail="${esc(m.id)}">All markets ↗</button></div>
+  </article>`;
+ }).join('');
+ $('matches').querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>showDetail(b.dataset.detail));
+}
+function showDetail(id){
+ const m=state.matches.find(x=>x.id===id);if(!m)return;
+ $('detailTitle').textContent=m.title;
+ $('detailBody').innerHTML=(m.markets||[]).map(mk=>`<div class="detailrow"><strong>${esc(mk.question)}</strong>${(mk.outcomes||[]).map((o,i)=>{const q=mk.quotes?.[i]||{};return `<div>${esc(o)} — BUY ${dec(q.ask)} · SELL ${dec(q.bid)}</div>`}).join('')}</div>`).join('');
+ if(m.url)$('detailBody').insertAdjacentHTML('beforeend',`<p><a class="link" target="_blank" rel="noopener" href="${esc(m.url)}">Open on Polymarket ↗</a></p>`);
+ $('details').showModal();
+}
+$('closeDetails').onclick=()=>$('details').close();
+$('details').addEventListener('click',e=>{if(e.target===$('details'))$('details').close()});
+$('sports').onclick=e=>{const b=e.target.closest('[data-sport]');if(!b)return;state.sport=b.dataset.sport;$('sports').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));render()};
+$('times').onclick=e=>{const b=e.target.closest('[data-time]');if(!b)return;state.time=b.dataset.time;$('times').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));render()};
+$('search').addEventListener('input',e=>{state.query=e.target.value.trim().toLowerCase();render()});
+$('refresh').onclick=()=>worker.postMessage({cmd:'refresh'});
+worker.onmessage=e=>{
+ const m=e.data;
+ if(m.type==='status')$('status').textContent=m.text;
+ if(m.type==='conn')$('status').textContent=m.connected?'CLOB connected · waiting for quotes':'CLOB disconnected · reconnecting';
+ if(m.type==='stats'){$('status').textContent=`${m.events} events scanned · ${m.matches} matches · ${m.packets} packets${m.latency==null?'':' · '+m.latency+' ms fetch'}`}
+ if(m.type==='matches'){state.matches=m.matches;render()}
+ if(m.type==='quote'){const match=state.matches.find(x=>x.id===m.matchId);if(match){match.quote=m.quote;for(const mk of match.markets||[]){mk.quotes=mk.quotes||[];const i=mk.tokens?.indexOf(m.token);if(i>=0)mk.quotes[i]=m.quote}render()}}
+ if(m.type==='quotes'){for(const match of state.matches){match.quote=m.quotes[match.token]||match.quote||{};for(const mk of match.markets||[]){mk.quotes=(mk.tokens||[]).map(t=>m.quotes[t]||{})}}render()}
+ if(m.type==='error')$('status').textContent='Data error: '+m.message;
+};
+worker.postMessage({cmd:'refresh'});
 </script>
 </body>
 </html>
