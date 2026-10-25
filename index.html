@@ -1,210 +1,492 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#ffffff">
-<title>CRYSTAL EDGE — Polymarket Live Sports</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CRYSTAL EDGE</title>
 <style>
-:root{color-scheme:light;--bg:#fff;--panel:#fff;--line:#dedede;--muted:#666;--ink:#111;--soft:#f6f6f6}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-header{position:sticky;top:0;z-index:3;background:#ffffffed;backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:13px max(14px,env(safe-area-inset-left))}
-.top{display:flex;justify-content:space-between;align-items:center;gap:10px}.logo{font-weight:850;letter-spacing:.5px;font-size:17px}.sub{font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:.8px}
-button,input{font:inherit}button{border:1px solid #ccc;background:#fff;color:#111;border-radius:9px;padding:9px 11px;cursor:pointer;white-space:nowrap}button:disabled{opacity:.45}button.active{background:#111;color:#fff;border-color:#111}
-#status{font-size:11px;color:#555;margin-top:10px;line-height:1.5}
-main{max-width:1000px;margin:auto;padding:13px}.filters{display:flex;gap:7px;overflow-x:auto;padding:3px 0 10px;scrollbar-width:thin}.filters button{font-size:12px}
-#search{width:100%;padding:12px;border:1px solid #ccc;border-radius:10px;background:#fff;color:#111;margin:3px 0 10px;outline:none}
-#summary{font-size:11px;color:#555;margin:4px 1px 12px;line-height:1.5}
-#matches{display:grid;grid-template-columns:1fr;gap:10px}.card{border:1px solid var(--line);border-radius:12px;padding:13px;min-width:0;background:#fff}
-.meta,.bottom{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#666;font-size:10px}.match{font-weight:800;font-size:16px;margin:11px 0 5px;overflow-wrap:anywhere}.question{font-size:11px;color:#666;margin-bottom:11px}
-.odds{display:grid;grid-template-columns:1fr 1fr;gap:8px}.odd{border:1px solid #ddd;border-radius:9px;padding:10px;min-width:0;background:#fafafa}.label{font-size:10px;font-weight:800;color:#555}.price{font-size:22px;font-weight:850;margin:5px 0;font-variant-numeric:tabular-nums}.name{font-size:11px;overflow-wrap:anywhere}.bottom{margin-top:11px;flex-wrap:wrap}.bottom button{font-size:11px;padding:7px 9px}
-.empty{border:1px dashed #bbb;border-radius:11px;padding:24px;text-align:center;color:#555;line-height:1.5}
-.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:10px 0 12px}.metric{border:1px solid var(--line);border-radius:9px;padding:9px;background:#fff}.metric b{display:block;font-size:14px;font-variant-numeric:tabular-nums}.metric span{font-size:10px;color:#666}
-.socketbar{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.socketbar button{font-size:11px;padding:7px 9px}
-dialog{width:min(680px,95vw);max-height:85vh;overflow:auto;border:1px solid #bbb;border-radius:13px;background:#fff;color:#111;padding:14px}dialog::backdrop{background:#0006}.detailrow{padding:10px 0;border-bottom:1px solid #e4e4e4}.detailrow strong{display:block;margin-bottom:7px}.outcome{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:12px}.detailactions{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}.link{color:#111;text-decoration:underline}footer{max-width:1000px;margin:auto;padding:0 14px 24px;color:#666;font-size:10px;line-height:1.5}
-@media(min-width:650px){#matches{grid-template-columns:repeat(2,minmax(0,1fr))}.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#111;font:14px Arial,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px;border-bottom:1px solid #ddd}
+h1{font-size:18px;margin:0;font-weight:600}
+button,input,select{font:inherit;background:white;color:#111;border:1px solid #ccc;border-radius:4px;padding:9px}
+button{cursor:pointer}
+main{max-width:900px;margin:auto;padding:12px}
+.stats{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.stat{border:1px solid #ddd;padding:7px;font-size:12px;border-radius:4px}
+.controls,.sports{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+#search{flex:1;min-width:150px}
+.sports button.active{background:#eee;font-weight:bold}
+.match{border:1px solid #ddd;border-radius:4px;padding:12px;margin:10px 0}
+.top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.title{font-weight:bold;font-size:15px}
+.small{font-size:12px;color:#555;margin-top:5px}
+.outcomes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.outcome{border:1px solid #ddd;padding:9px;min-width:0}
+.outcome strong{font-size:17px}
+.row{display:flex;justify-content:space-between;gap:6px;margin-top:6px;font-size:12px}
+.depth{font-size:12px;line-height:1.7;margin-top:8px}
+#message{padding:16px 4px;color:#555;white-space:pre-wrap}
+a{color:#111}
+details{margin-top:10px}
+summary{cursor:pointer}
+@media(max-width:430px){main{padding:9px}.match{padding:10px}.outcomes{gap:6px}}
 </style>
 </head>
 <body>
-<header><div class="top"><div><div class="logo">◇ CRYSTAL EDGE</div><div class="sub">POLYMARKET · LIVE SPORTS</div></div><button id="refresh">Refresh</button></div>
-<div id="status">Starting…</div>
-<div class="socketbar">
-<button id="sockA">Socket A: ON</button><button id="sockB">Socket B: OFF</button><button id="both">Both ON</button>
-</div></header>
+<header>
+  <h1>CRYSTAL EDGE</h1>
+  <button id="refresh">Refresh</button>
+</header>
 <main>
-<div class="filters" id="sports"><button class="active" data-sport="all">All Sports</button><button data-sport="cricket">Cricket</button><button data-sport="tennis">Tennis</button><button data-sport="football">Football</button></div>
-<div class="filters" id="times"><button class="active" data-time="all">All Matches</button><button data-time="live">Live Now</button><button data-time="today">Today</button><button data-time="tomorrow">Tomorrow</button><button data-time="upcoming">Upcoming</button></div>
-<input id="search" type="search" placeholder="Search team, player or match…">
-<div class="metrics">
-<div class="metric"><b id="eventsMetric">—</b><span>Events scanned</span></div>
-<div class="metric"><b id="packetsMetric">0</b><span>Total WS packets</span></div>
-<div class="metric"><b id="rateMetric">0/s</b><span>Packets per second (rolling)</span></div>
-<div class="metric"><b id="latencyMetric">—</b><span>Receive → render</span></div>
-<div class="metric"><b id="ageMetric">—</b><span>Last packet age</span></div>
-<div class="metric"><b id="aMetric">OFF</b><span>Socket A · main odds</span></div>
-<div class="metric"><b id="bMetric">OFF</b><span>Socket B · extra markets</span></div>
-<div class="metric"><b id="quoteMetric">—</b><span>Latest quote age</span></div>
-</div>
-<div id="summary">Loading actual Polymarket markets…</div><section id="matches"><div class="empty">Loading Polymarket Gamma data. No demo odds are used.</div></section>
+  <div class="stats">
+    <span class="stat" id="gamma">Gamma: waiting</span>
+    <span class="stat" id="ws1">WS 1: disconnected</span>
+    <span class="stat" id="ws2">WS 2: disconnected</span>
+    <span class="stat" id="packets">Packets: 0</span>
+    <span class="stat" id="rate">Packets/ms: 0</span>
+    <span class="stat" id="latency">Request: —</span>
+    <span class="stat" id="quoteAge">Quote age: —</span>
+  </div>
+
+  <div class="controls">
+    <input id="search" placeholder="Search match or player">
+    <select id="time">
+      <option value="all">All upcoming</option>
+      <option value="today">Today</option>
+      <option value="tomorrow">Tomorrow</option>
+    </select>
+    <select id="sort">
+      <option value="start">Start time</option>
+      <option value="liquidity">Liquidity</option>
+    </select>
+  </div>
+
+  <div class="sports">
+    <button class="active" data-sport="all">All 3</button>
+    <button data-sport="cricket">Cricket</button>
+    <button data-sport="tennis">Tennis</button>
+    <button data-sport="football">Football</button>
+  </div>
+
+  <div class="small" id="summary">Waiting for Worker data</div>
+  <div id="message">Connecting to your Cloudflare Worker…</div>
+  <div id="matches"></div>
 </main>
-<footer>Source: Polymarket Gamma API + public Polymarket CLOB market WebSocket. BUY = best ask and SELL = best bid; displayed decimal odds are 1 ÷ price. Socket A updates the main outcome market. Socket B subscribes to additional markets when All Markets is opened. No quotes or liquidity are fabricated.</footer>
-<dialog id="details"><div class="detailactions"><strong id="detailTitle">All Markets</strong><button id="closeDetails">Close</button></div><div id="detailStatus">Socket B connects when this panel opens.</div><div id="detailBody"></div></dialog>
+
 <script>
-'use strict';
-const WORKER_URL = 'https://crystal-odds-api.karanarora082000.workers.dev';
-const CLOB_WS = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
+"use strict";
+
+/* YOUR EXISTING CLOUDFLARE WORKER */
+const WORKER = "https://crystal-live-odds.mbeta3996.workers.dev";
+const CLOB_WS = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
+
+const REFRESH_MS = 15000;
+const BATCH_SIZE = 100;
+
+let allMarkets = [];
+let selectedSport = "all";
+let sockets = [];
+let packetCount = 0;
+let firstPacketAt = 0;
+let lastPacketAt = 0;
+let lastQuoteAt = 0;
+let requestMs = null;
+let refreshing = false;
+let reconnectTimer = null;
+
+const quotes = new Map();
+const subscribed = new Set();
 const $ = id => document.getElementById(id);
-const state = {matches:[], sport:'all', time:'all', query:'', packets:0, lastPacket:0, lastQuote:0, renderLatency:null, packetTimes:[], socketA:null, socketB:null, aOn:true, bOn:false, aRetry:null, bRetry:null, activeDetail:null, detailTokens:new Set(), quoteByToken:{}, refreshBusy:false};
-const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const dec = p => {p=Number(p);return Number.isFinite(p)&&p>0&&p<1?(1/p).toFixed(2):'—'};
-const parseDate = d => {if(!d)return null;const x=new Date(d);return Number.isNaN(x.getTime())?null:x};
-function isLive(m){const d=parseDate(m.date);return !!d&&d<=new Date()&&Date.now()-d.getTime()<8*60*60*1000}
-function visible(m){
- if(state.sport!=='all'&&m.sport!==state.sport)return false;
- if(state.query&&!(m.title+' '+m.question+' '+(m.slug||'')).toLowerCase().includes(state.query))return false;
- const d=parseDate(m.date),now=new Date(),start=new Date(now);start.setHours(0,0,0,0);const tomorrow=new Date(start);tomorrow.setDate(tomorrow.getDate()+1);const after=new Date(tomorrow);after.setDate(after.getDate()+1);
- if(state.time==='live')return isLive(m);
- if(state.time==='today')return !!d&&d>=start&&d<tomorrow;
- if(state.time==='tomorrow')return !!d&&d>=tomorrow&&d<after;
- if(state.time==='upcoming')return !!d&&d>=now;
- return true;
-}
-function quote(token){return state.quoteByToken[token]||{}}
-function mainTokens(m){return (m.tokenIds||[]).filter(Boolean)}
-function allTokens(m){return [...new Set((m.markets||[]).flatMap(x=>x.tokenIds||[]).filter(Boolean))]}
-function render(){
- const list=state.matches.filter(visible);$('summary').textContent=`${list.length} shown · ${state.matches.length} eligible matches · quotes are live only when a real CLOB book update is received`;
- if(!list.length){$('matches').innerHTML='<div class="empty">No matching active team/player markets found. Try another filter or Refresh.</div>';return}
- $('matches').innerHTML=list.map(m=>{
-  const tok=mainTokens(m),aTok=tok[0],q=quote(aTok),out=m.outcomes||[];
-  const d=parseDate(m.date),label=isLive(m)?'LIVE':d?d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'Time unavailable';
-  return `<article class="card"><div class="meta"><span>${esc(m.sport)}</span><span>${esc(label)}</span></div><div class="match">${esc(m.title)}</div><div class="question">${esc(m.question||'Main market')}</div><div class="odds">
-  <div class="odd"><div class="label">BUY · BEST ASK</div><div class="price">${dec(q.ask)}</div><div class="name">${esc(out[0]||'Outcome 1')}</div></div>
-  <div class="odd"><div class="label">SELL · BEST BID</div><div class="price">${dec(q.bid)}</div><div class="name">${esc(out[0]||'Outcome 1')}</div></div></div>
-  <div class="bottom"><span>${q.at?'Quote '+Math.max(0,Math.round((Date.now()-q.at)/1000))+'s ago':'Waiting for real quote'}</span><button data-detail="${esc(m.id)}">All Markets (${(m.markets||[]).length})</button>${m.url?`<a class="link" target="_blank" rel="noopener" href="${esc(m.url)}">Polymarket ↗</a>`:''}</div></article>`;
- }).join('');
- $('matches').querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>showDetail(b.dataset.detail));
-}
-function updateMetrics(){
- const now=Date.now(),recent=state.packetTimes.filter(t=>now-t<=1000).length;
- $('packetsMetric').textContent=state.packets.toLocaleString();$('rateMetric').textContent=recent+'/s';
- $('latencyMetric').textContent=state.renderLatency==null?'—':state.renderLatency+' ms';
- $('ageMetric').textContent=state.lastPacket?Math.floor((now-state.lastPacket)/1000)+'s':'—';
- $('quoteMetric').textContent=state.lastQuote?Math.floor((now-state.lastQuote)/1000)+'s':'—';
- $('aMetric').textContent=state.aOn?(state.socketA&&state.socketA.readyState===1?'CONNECTED':'CONNECTING'):'OFF';
- $('bMetric').textContent=state.bOn?(state.socketB&&state.socketB.readyState===1?'CONNECTED':'CONNECTING'):'OFF';
- $('sockA').textContent='Socket A: '+(state.aOn?'ON':'OFF');$('sockB').textContent='Socket B: '+(state.bOn?'ON':'OFF');
-}
-function notePacket(){
- const t=Date.now();state.packets++;state.lastPacket=t;state.packetTimes.push(t);state.packetTimes=state.packetTimes.filter(x=>t-x<5000);
-}
-function handleMessage(which,raw){
- const start=performance.now();let data;
- try{data=JSON.parse(raw)}catch{return}
- const list=Array.isArray(data)?data:[data];
- for(const ev of list){
-  notePacket();
-  const type=String(ev.event_type||ev.type||'').toLowerCase();
-  const token=String(ev.asset_id||ev.token_id||ev.assetId||'');
-  const apply=(id,bid,ask)=>{
-   if(!id)return;const old=state.quoteByToken[id]||{};
-   const next={...old};
-   if(bid!==undefined&&bid!==null&&bid!=='')next.bid=Number(bid);
-   if(ask!==undefined&&ask!==null&&ask!=='')next.ask=Number(ask);
-   next.at=Date.now();state.quoteByToken[id]=next;state.lastQuote=Date.now();
-  };
-  if(type==='best_bid_ask'||ev.best_bid!==undefined||ev.best_ask!==undefined){
-   apply(token,ev.best_bid??ev.bestBid,ev.best_ask??ev.bestAsk);
-  } else if(type==='price_change'&&Array.isArray(ev.price_changes)){
-   for(const change of ev.price_changes)apply(String(change.asset_id||''),change.best_bid,change.best_ask);
-  } else if(type==='book'&&token){
-   const bids=Array.isArray(ev.bids)?ev.bids:[],asks=Array.isArray(ev.asks)?ev.asks:[];
-   const bestBid=bids.map(x=>Number(x.price)).filter(Number.isFinite).sort((a,b)=>b-a)[0];
-   const bestAsk=asks.map(x=>Number(x.price)).filter(Number.isFinite).sort((a,b)=>a-b)[0];
-   apply(token,bestBid,bestAsk);
+
+function parseArray(v) {
+  if (Array.isArray(v)) return v;
+  try {
+    const a = JSON.parse(v);
+    return Array.isArray(a) ? a : [];
+  } catch {
+    return [];
   }
- }
- state.renderLatency=Math.max(0,Math.round(performance.now()-start));render();updateMetrics();
 }
-function subscribe(ws,tokens){
- const ids=[...new Set(tokens)].filter(Boolean);
- if(!ws||ws.readyState!==1||!ids.length)return;
- for(let i=0;i<ids.length;i+=400)ws.send(JSON.stringify({assets_ids:ids.slice(i,i+400),type:'market'}));
+
+function decimal(price) {
+  const p = Number(price);
+  return p > 0 && p <= 1 ? (1 / p).toFixed(2) : "—";
 }
-function openSocket(which){
- const isA=which==='A',enabled=isA?state.aOn:state.bOn;
- if(!enabled)return;
- const key=isA?'socketA':'socketB',retry=isA?'aRetry':'bRetry';
- const old=state[key];if(old){try{old.close()}catch{}}
- const ws=new WebSocket(CLOB_WS);state[key]=ws;updateMetrics();
- ws.onopen=()=>{
-  if(state[key]!==ws)return;
-  if(isA)subscribe(ws,state.matches.flatMap(mainTokens));
-  else if(state.activeDetail){const m=state.matches.find(x=>x.id===state.activeDetail);if(m)subscribe(ws,allTokens(m));}else subscribe(ws,state.matches.flatMap(m=>allTokens(m).filter(t=>!mainTokens(m).includes(t))));
-  $('status').textContent=`Socket A ${state.aOn?(state.socketA?.readyState===1?'connected':'connecting'):'off'} · Socket B ${state.bOn?(state.socketB?.readyState===1?'connected':'connecting'):'off'} · Polymarket CLOB`;
-  updateMetrics();
- };
- ws.onmessage=e=>{if(state[key]===ws)handleMessage(which,e.data)};
- ws.onerror=()=>{if(state[key]===ws){$('status').textContent=`Socket ${which} error; retrying if enabled`; }};
- ws.onclose=()=>{
-  if(state[key]!==ws)return;
-  updateMetrics();
-  if((isA?state.aOn:state.bOn))state[retry]=setTimeout(()=>openSocket(which),2500);
-  $('status').textContent=`Socket ${which} disconnected${(isA?state.aOn:state.bOn)?' · reconnecting':''}`;
- };
+
+function money(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0
+    ? "€" + n.toFixed(2)
+    : "—";
 }
-function stopSocket(which){
- const isA=which==='A',key=isA?'socketA':'socketB',retry=isA?'aRetry':'bRetry';
- if(state[retry])clearTimeout(state[retry]);state[retry]=null;
- const ws=state[key];state[key]=null;
- if(ws){ws.onclose=null;ws.onmessage=null;ws.onerror=null;try{ws.close()}catch{}}
- updateMetrics();
+
+function updateStats() {
+  $("packets").textContent = "Packets: " + packetCount;
+
+  const elapsed = firstPacketAt
+    ? Math.max(1, lastPacketAt - firstPacketAt)
+    : 0;
+
+  $("rate").textContent = "Packets/ms: " +
+    (elapsed ? (packetCount / elapsed).toFixed(4) : "0");
+
+  $("latency").textContent = "Request: " +
+    (requestMs == null ? "—" : requestMs + " ms");
+
+  $("quoteAge").textContent = "Quote age: " +
+    (lastQuoteAt ? Math.max(0, Date.now() - lastQuoteAt) + " ms" : "—");
+
+  $("ws1").textContent = "WS 1: " +
+    (sockets[0] && sockets[0].readyState === WebSocket.OPEN
+      ? "connected" : "disconnected");
+
+  $("ws2").textContent = "WS 2: " +
+    (sockets[1] && sockets[1].readyState === WebSocket.OPEN
+      ? "connected" : "disconnected");
 }
-function syncSockets(){
- stopSocket('A');stopSocket('B');
- if(state.aOn)openSocket('A');
- if(state.bOn)openSocket('B');
- $('status').textContent=`Socket A ${state.aOn?'enabled':'off'} · Socket B ${state.bOn?'enabled':'off'} · loading/using Polymarket CLOB`;
+
+async function loadMarkets() {
+  if (refreshing) return;
+  refreshing = true;
+  $("message").textContent = "Loading markets from your Cloudflare Worker…";
+
+  const started = performance.now();
+
+  try {
+    const url = WORKER + "/matches?limit=200&offset=0&sport=all";
+    const response = await fetch(url, { cache: "no-store" });
+
+    requestMs = Math.round(performance.now() - started);
+    if (!response.ok) throw new Error("Worker HTTP " + response.status);
+
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error || "Worker error");
+
+    const data = Array.isArray(result.data) ? result.data : [];
+    allMarkets = data.filter(m =>
+      ["cricket", "tennis", "football"].includes(m.sport) &&
+      Array.isArray(m.tokenIds) && m.tokenIds.length >= 2
+    );
+
+    $("gamma").textContent = "Worker: connected";
+    $("summary").textContent =
+      "Matches returned: " + allMarkets.length +
+      " · Scanned events: " + (result.scannedEvents ?? "—") +
+      " · " + (result.timestamp || "");
+
+    if (result.warnings && result.warnings.length) {
+      $("message").textContent = "Worker warning: " + result.warnings.join("; ");
+    } else {
+      $("message").textContent = allMarkets.length
+        ? ""
+        : "Worker returned no eligible matches. Check /matches response and its warnings.";
+    }
+
+    subscribeTokens();
+    render();
+  } catch (error) {
+    $("gamma").textContent = "Worker: error";
+    $("message").textContent =
+      "Could not load Worker data.\n" + error.message +
+      "\nCheck the Worker /health endpoint and its /matches response.";
+  } finally {
+    refreshing = false;
+    updateStats();
+  }
 }
-async function refresh(){
- if(state.refreshBusy)return;state.refreshBusy=true;$('refresh').disabled=true;
- $('status').textContent='Fetching actual markets from Polymarket Gamma…';
- try{
-  const u=new URL(WORKER_URL+'/matches');u.searchParams.set('sport',state.sport);u.searchParams.set('window','all');if(state.query)u.searchParams.set('q',state.query);
-  const t=performance.now(),r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('Worker HTTP '+r.status);
-  const data=await r.json();if(!data.success)throw new Error(data.error||'Worker response unsuccessful');
-  state.matches=Array.isArray(data.matches)?data.matches:[];$('eventsMetric').textContent=Number(data.eventsScanned||0).toLocaleString();
-  $('status').textContent=`Gamma OK · ${data.eventsScanned||0} events scanned · ${state.matches.length} eligible matches · REST ${Math.round(performance.now()-t)} ms`;
+
+function allTokens() {
+  const set = new Set();
+  for (const m of allMarkets) {
+    for (const t of m.tokenIds || []) {
+      if (t) set.add(String(t));
+    }
+  }
+  return [...set];
+}
+
+function subscribeTokens() {
+  const tokens = allTokens();
+  if (!tokens.length) return;
+
+  // Split subscriptions between two independent public connections.
+  const chunks = [[], []];
+  tokens.forEach((t, i) => chunks[i % 2].push(t));
+
+  for (let i = 0; i < 2; i++) {
+    const existing = sockets[i];
+    const signature = chunks[i].join(",");
+    if (existing && existing._signature === signature &&
+        existing.readyState <= WebSocket.OPEN) continue;
+
+    if (existing) {
+      try { existing.close(); } catch {}
+    }
+
+    if (!chunks[i].length) {
+      sockets[i] = null;
+      continue;
+    }
+
+    const ws = new WebSocket(CLOB_WS);
+    ws._signature = signature;
+    sockets[i] = ws;
+
+    ws.onopen = () => {
+      $("ws" + (i + 1)).textContent = "WS " + (i + 1) + ": connected";
+      // Public CLOB market-channel subscription.
+      ws.send(JSON.stringify({
+        assets_ids: chunks[i],
+        type: "market"
+      }));
+      updateStats();
+    };
+
+    ws.onmessage = event => {
+      packetCount++;
+      const now = Date.now();
+      if (!firstPacketAt) firstPacketAt = now;
+      lastPacketAt = now;
+
+      try {
+        const data = JSON.parse(event.data);
+        const events = Array.isArray(data) ? data : [data];
+        for (const item of events) processPacket(item);
+      } catch {}
+
+      updateStats();
+    };
+
+    ws.onerror = () => {
+      $("ws" + (i + 1)).textContent = "WS " + (i + 1) + ": error";
+    };
+
+    ws.onclose = () => {
+      $("ws" + (i + 1)).textContent = "WS " + (i + 1) + ": disconnected";
+      updateStats();
+    };
+  }
+}
+
+function processPacket(packet) {
+  if (!packet || typeof packet !== "object") return;
+
+  if (packet.event_type === "price_change" &&
+      Array.isArray(packet.price_changes)) {
+    for (const change of packet.price_changes) {
+      updateQuote(change.asset_id, change);
+    }
+    return;
+  }
+
+  const token = packet.asset_id || packet.assetId || packet.token_id;
+  if (token) updateQuote(token, packet);
+
+  if (packet.event_type === "book" && token) {
+    const bids = Array.isArray(packet.bids) ? packet.bids : [];
+    const asks = Array.isArray(packet.asks) ? packet.asks : [];
+    const bestBid = bids.reduce((best, x) =>
+      Number(x.price) > Number(best?.price ?? 0) ? x : best, null);
+    const bestAsk = asks.reduce((best, x) =>
+      Number(x.price) < Number(best?.price ?? Infinity) ? x : best, null);
+
+    updateQuote(token, {
+      best_bid: bestBid?.price,
+      best_ask: bestAsk?.price,
+      bid_size: bestBid?.size,
+      ask_size: bestAsk?.size
+    });
+  }
+}
+
+function updateQuote(token, packet) {
+  if (!token || !packet) return;
+
+  const key = String(token);
+  const previous = quotes.get(key) || {};
+
+  const bid = packet.best_bid ?? packet.bestBid ??
+    packet.bid ?? packet.price_changes?.best_bid;
+  const ask = packet.best_ask ?? packet.bestAsk ??
+    packet.ask ?? packet.price_changes?.best_ask;
+
+  const next = { ...previous, time: Date.now() };
+
+  if (bid != null && Number(bid) > 0) next.bid = Number(bid);
+  if (ask != null && Number(ask) > 0) next.ask = Number(ask);
+
+  if (packet.bid_size != null) next.bidSize = Number(packet.bid_size);
+  if (packet.ask_size != null) next.askSize = Number(packet.ask_size);
+
+  if (packet.size != null && packet.side) {
+    if (String(packet.side).toUpperCase() === "BUY") next.askSize = Number(packet.size);
+    if (String(packet.side).toUpperCase() === "SELL") next.bidSize = Number(packet.size);
+  }
+
+  quotes.set(key, next);
+  lastQuoteAt = Date.now();
   render();
-  if(state.aOn&&state.socketA&&state.socketA.readyState===1)subscribe(state.socketA,state.matches.flatMap(mainTokens));
-  if(state.bOn&&state.socketB&&state.socketB.readyState===1){if(state.activeDetail){const m=state.matches.find(x=>x.id===state.activeDetail);if(m)subscribe(state.socketB,allTokens(m));}else subscribe(state.socketB,state.matches.flatMap(m=>allTokens(m).filter(t=>!mainTokens(m).includes(t))));}
- }catch(e){$('status').textContent='Data error: '+(e?.message||String(e));if(!state.matches.length)$('matches').innerHTML='<div class="empty">Could not load Polymarket markets. Check the Worker URL/deployment and refresh.</div>'}
- finally{state.refreshBusy=false;$('refresh').disabled=false;updateMetrics()}
 }
-async function showDetail(id){
- const m=state.matches.find(x=>x.id===id);if(!m)return;
- state.activeDetail=id;$('detailTitle').textContent=m.title;$('detailBody').innerHTML='';
- const markets=m.markets||[];
- if(!markets.length)$('detailBody').innerHTML='<div class="empty">No active markets with token IDs were returned by Polymarket.</div>';
- else $('detailBody').innerHTML=markets.map(mk=>`<div class="detailrow"><strong>${esc(mk.question||'Market')}</strong>${(mk.outcomes||[]).map((o,i)=>{const q=quote((mk.tokenIds||[])[i]);return `<div class="outcome"><span>${esc(o)}</span><span>BUY ${dec(q.ask)} · SELL ${dec(q.bid)}</span></div>`}).join('')}</div>`).join('');
- if(m.url)$('detailBody').insertAdjacentHTML('beforeend',`<p><a class="link" target="_blank" rel="noopener" href="${esc(m.url)}">Open on Polymarket ↗</a></p>`);
- $('detailStatus').textContent='Socket B subscribes to additional market tokens while this panel is open.';
- if(!state.bOn){state.bOn=true;openSocket('B')}else{stopSocket('B');openSocket('B')}
- $('details').showModal();
+
+function timeAllowed(m) {
+  if (!m.startTime) return $("time").value === "all";
+
+  const start = new Date(m.startTime);
+  if (Number.isNaN(start.getTime())) return $("time").value === "all";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(+today + 86400000);
+  const nextDay = new Date(+today + 172800000);
+
+  if ($("time").value === "today") return start >= today && start < tomorrow;
+  if ($("time").value === "tomorrow") return start >= tomorrow && start < nextDay;
+  return start >= today;
 }
-function closeDetail(){if($('details').open)$('details').close();state.activeDetail=null;if(state.bOn){stopSocket('B');openSocket('B');updateMetrics()}}
-$('closeDetails').onclick=closeDetail;
-$('details').addEventListener('click',e=>{if(e.target===$('details'))closeDetail()});
-$('sports').onclick=e=>{const b=e.target.closest('[data-sport]');if(!b)return;state.sport=b.dataset.sport;$('sports').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));refresh()};
-$('times').onclick=e=>{const b=e.target.closest('[data-time]');if(!b)return;state.time=b.dataset.time;$('times').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));render()};
-let searchTimer=null;
-$('search').addEventListener('input',e=>{state.query=e.target.value.trim().toLowerCase();clearTimeout(searchTimer);searchTimer=setTimeout(refresh,300)});
-$('refresh').onclick=refresh;
-$('sockA').onclick=()=>{state.aOn=!state.aOn;if(!state.aOn)stopSocket('A');else openSocket('A');updateMetrics()};
-$('sockB').onclick=()=>{state.bOn=!state.bOn;if(!state.bOn)stopSocket('B');else if(state.activeDetail)openSocket('B');updateMetrics()};
-$('both').onclick=()=>{state.aOn=true;state.bOn=true;syncSockets()};
-setInterval(updateMetrics,1000);
-refresh().then(()=>{if(state.aOn)openSocket('A')});
+
+function formatTime(value) {
+  if (!value) return "Start time unavailable";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? "Start time unavailable"
+    : d.toLocaleString();
+}
+
+function render() {
+  const query = $("search").value.trim().toLowerCase();
+  const sort = $("sort").value;
+
+  let data = allMarkets.filter(m => {
+    if (selectedSport !== "all" && m.sport !== selectedSport) return false;
+    if (!timeAllowed(m)) return false;
+    return (m.title + " " + (m.question || "")).toLowerCase().includes(query);
+  });
+
+  if (sort === "liquidity") {
+    data.sort((a, b) => Number(b.liquidity || 0) - Number(a.liquidity || 0));
+  } else {
+    data.sort((a, b) =>
+      (Date.parse(a.startTime || "") || Infinity) -
+      (Date.parse(b.startTime || "") || Infinity)
+    );
+  }
+
+  $("matches").innerHTML = "";
+
+  if (!data.length) {
+    if (!$("message").textContent) {
+      $("message").textContent = "No matching markets available.";
+    }
+    return;
+  }
+
+  $("message").textContent = "";
+
+  for (const m of data) {
+    const card = document.createElement("article");
+    card.className = "match";
+
+    const top = document.createElement("div");
+    top.className = "top";
+
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = m.title;
+
+    const sport = document.createElement("div");
+    sport.className = "small";
+    sport.textContent = m.sport.toUpperCase();
+
+    top.append(title, sport);
+    card.append(top);
+
+    const time = document.createElement("div");
+    time.className = "small";
+    time.textContent = formatTime(m.startTime);
+    card.append(time);
+
+    const outcomes = document.createElement("div");
+    outcomes.className = "outcomes";
+
+    m.tokenIds.slice(0, 2).forEach((token, index) => {
+      const label = (m.outcomes && m.outcomes[index]) || ("Outcome " + (index + 1));
+      const q = quotes.get(String(token)) || {};
+
+      const panel = document.createElement("div");
+      panel.className = "outcome";
+
+      const name = document.createElement("div");
+      name.textContent = label;
+
+      const buy = document.createElement("div");
+      buy.className = "row";
+      buy.innerHTML = "<span>BUY odds</span><strong></strong>";
+      buy.querySelector("strong").textContent = decimal(q.ask);
+
+      const sell = document.createElement("div");
+      sell.className = "row";
+      sell.innerHTML = "<span>SELL odds</span><strong></strong>";
+      sell.querySelector("strong").textContent = decimal(q.bid);
+
+      const depth = document.createElement("div");
+      depth.className = "depth";
+      depth.textContent =
+        "Best ask size: " + (q.askSize != null ? money(q.askSize) : "—") +
+        "\nBest bid size: " + (q.bidSize != null ? money(q.bidSize) : "—");
+
+      panel.append(name, buy, sell, depth);
+      outcomes.append(panel);
+    });
+
+    card.append(outcomes);
+
+    const more = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = "Market details";
+    more.append(summary);
+
+    const detail = document.createElement("div");
+    detail.className = "depth";
+    detail.textContent =
+      "Liquidity: " + money(m.liquidity) +
+      "\nQuote data: public CLOB WebSocket";
+
+    more.append(detail);
+
+    if (m.url) {
+      const link = document.createElement("a");
+      link.href = m.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Open on Polymarket";
+      more.append(document.createElement("br"), link);
+    }
+
+    card.append(more);
+    $("matches").append(card);
+  }
+}
+
+$("refresh").addEventListener("click", loadMarkets);
+$("search").addEventListener("input", render);
+$("time").addEventListener("change", render);
+$("sort").addEventListener("change", render);
+
+document.querySelectorAll("[data-sport]").forEach(button => {
+  button.addEventListener("click", () => {
+    selectedSport = button.dataset.sport;
+    document.querySelectorAll("[data-sport]").forEach(b =>
+      b.classList.toggle("active", b === button)
+    );
+    render();
+  });
+});
+
+loadMarkets();
+setInterval(loadMarkets, REFRESH_MS);
+setInterval(updateStats, 1000);
 </script>
 </body>
 </html>
