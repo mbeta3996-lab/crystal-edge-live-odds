@@ -474,26 +474,19 @@ async function fetchAllMatches() {
 
     updateSubscriptions();
 
-  } catch (error) {
-
-    $("resultlabel").textContent = "Match feed error";
-
-    $("message").textContent =
-
-      `Could not load matches: ${error.message}. Check the Worker URL or network, then tap refresh.`;
-
-    $("message").style.display = "block";
-
-  } finally {
-
-    refreshBusy = false;
-
-    $("refresh").disabled = false;
-
-  }
-
+} catch (error) {
+  $("resultlabel").textContent = "Match feed error";
+  $("message").style.display = "block";
+  $("message").textContent =
+    `Could not load matches: ${error.name || "Error"} — ` +
+    `${error.message || String(error)}. ` +
+    `Worker: ${WORKER}/matches?offset=0&sport=all&limit=2`;
+} finally {
+  refreshBusy = false;
+  $("refresh").disabled = false;
 }
 
+}
 function setSocketStatus(text, connected) {
 
   $("wsstatus").textContent = text;
