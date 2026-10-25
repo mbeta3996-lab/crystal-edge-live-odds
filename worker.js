@@ -55,17 +55,31 @@ function sportOf(event) {
   if (/\b(soccer|football|premier league|champions league|la liga|serie a|bundesliga|ligue 1|mls|fifa|uefa)\b/.test(text)) return 'soccer';
 
   return null;
-}
-
+  }
 function isMatchTitle(title) {
   if (!title) return false;
 
-  if (/\b(winner of|champion|outright|ballon d'or|mvp|election|president|fomc|bitcoin|ethereum|s&p 500|stock price)\b/i.test(title)) {
+  const text = String(title).trim();
+
+  if (/\b(toss|most sixes|most fours|top scorer|player of the match|match double|double chance|correct score|outright|champion|ballon d'or|bitcoin|ethereum|s&p 500)\b/i.test(text)) {
     return false;
   }
 
-  return /\b(vs?\.?|versus)\b/i.test(title);
+  const matches = text.match(/\b(.+?)\s+(?:vs?\.?|versus)\s+(.+?)\b/i);
+  if (!matches) return false;
+
+  const normalize = s =>
+    s.toLowerCase()
+     .replace(/[^a-z0-9 ]/g, " ")
+     .replace(/\s+/g, " ")
+     .trim();
+
+  const a = normalize(matches[1]);
+  const b = normalize(matches[2]);
+
+  return Boolean(a && b && a !== b);
 }
+
 
 function getTokens(market) {
   let tokens = array(market.clobTokenIds || market.clob_token_ids || market.tokenIds);
@@ -87,7 +101,6 @@ function getOutcomes(market) {
 
   return [];
 }
-
 function validMarket(market) {
   return market &&
     market.active !== false &&
@@ -97,7 +110,10 @@ function validMarket(market) {
 
 function decimalPrice(price) {
   const p = Number(price);
-  return Number.isFinite(p) && p > 0 && p < 1 ? (1 / p).toFixed(2) : null;
+  if (!Number.isFinite(p) || p <= 0.02 || p >= 0.98) {
+    return null;
+  }
+  return (1 / p).toFixed(2);
 }
 
 function parseDate(event) {
