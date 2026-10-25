@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#ffffff">
 <title>CRYSTAL EDGE — Polymarket Live Sports</title>
 <style>
-:root{color-scheme:light;--ink:#111;--muted:#737373;--line:#e5e5e5;--soft:#f7f7f7;--green:#16803c;--red:#b42318}
+:root{color-scheme:light;--ink:#111;--muted:#737373;--line:#e5e5e5;--green:#16803c;--red:#b42318}
 *{box-sizing:border-box}
 body{margin:0;background:#fff;color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
 button,input{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -92,10 +92,7 @@ main{max-width:820px;margin:auto;padding:10px 11px 40px}
 <script>
 "use strict";
 
-// Cloudflare Worker already deployed by you.
 const API = "https://crystal-live-odds.mbeta3996.workers.dev";
-
-// Direct Polymarket CLOB WebSocket; no extra Worker relay hop.
 const CLOB_WS = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
 
 const $ = id => document.getElementById(id);
@@ -121,13 +118,10 @@ let subscriptionInitialized = false;
 let totalMessages = 0;
 let lastMessageAt = 0;
 let lastUiMs = 0;
-let renderQueued = false;
-let scanRunning = false;
 let scanOffset = 0;
 let scanFinished = false;
 let scanGeneration = 0;
 let scanController = null;
-
 let lastRateAt = Date.now();
 let rateBase = 0;
 
@@ -142,6 +136,7 @@ function currentISTDate() {
     timeZone:"Asia/Kolkata",
     year:"numeric",month:"2-digit",day:"2-digit"
   }).formatToParts(new Date());
+
   const p = Object.fromEntries(parts.map(x => [x.type,x.value]));
   return `${p.year}-${p.month}-${p.day}`;
 }
@@ -180,10 +175,7 @@ function visibleMatches() {
     if (chosenPeriod === "live" && !m.live) return false;
     if (chosenPeriod === "today" && !m.today) return false;
 
-    if (q && !`${m.title} ${m.originalTitle}`.toLowerCase().includes(q)) {
-      return false;
-    }
-    return true;
+    return !q || `${m.title} ${m.originalTitle}`.toLowerCase().includes(q);
   }).sort((a,b) => {
     if (a.live !== b.live) return a.live ? -1 : 1;
     return a.title.localeCompare(b.title);
@@ -193,6 +185,7 @@ function visibleMatches() {
 function renderCard(m) {
   const rows = m.tokens.map(t => {
     const p = getPrice(t.tokenId);
+
     return `
       <div class="outcome">
         <div class="outcome-name">${escapeHTML(t.name)}</div>
@@ -245,19 +238,14 @@ function render() {
   emptyEl.style.display = list.length ? "none" : "block";
 
   lastUiMs = performance.now() - start;
-  $("uiTime").textContent = `UI ${lastUiMs.toFixed(1)}ms`;
+  $("uiTime").textContent = `UI ${lastUiMs.toFixed(2)}ms`;
   $("progress").textContent =
     `${allMatches.size} matches · ${scanOffset.toLocaleString()} events scanned` +
     (scanFinished ? " · Scan complete" : " · Scanning available events…");
 }
 
 function scheduleRender() {
-  if (renderQueued) return;
-  renderQueued = true;
-  requestAnimationFrame(() => {
-    renderQueued = false;
-    render();
-  });
+  requestAnimationFrame(render);
 }
 
 function normalizeMatch(raw) {
@@ -290,15 +278,11 @@ function normalizeMatch(raw) {
     tokens,
     dateKey,
     today,
-    // Old-date events should already be rejected by the Worker.
-    // The UI does not invent live status from the clock.
     live:Boolean(raw.live) && today,
     lastPriceAt:0
   };
 }
 
-// Subscribe only to tokens needed by the currently visible match list.
-// Use one WebSocket connection for all required token IDs.
 function syncTokenSubscriptions() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
@@ -347,9 +331,7 @@ function addMatches(rows) {
 
   for (const raw of rows || []) {
     const m = normalizeMatch(raw);
-    if (!m) continue;
-
-    if (allMatches.has(m.id)) continue;
+    if (!m || allMatches.has(m.id)) continue;
 
     allMatches.set(m.id,m);
     for (const t of m.tokens) tokenToMatch.set(t.tokenId,m.id);
@@ -362,15 +344,12 @@ function addMatches(rows) {
   }
 }
 
-// Each Worker request scans up to 500 events. Continue using nextOffset
-// while hasMore is true, including when a page has zero eligible matches.
 async function loadAllMatches() {
   const generation = ++scanGeneration;
 
   if (scanController) scanController.abort();
   scanController = new AbortController();
 
-  scanRunning = true;
   scanOffset = 0;
   scanFinished = false;
 
@@ -396,7 +375,6 @@ async function loadAllMatches() {
       if (!response.ok) throw new Error(`Worker HTTP ${response.status}`);
 
       const payload = await response.json();
-
       if (generation !== scanGeneration) return;
 
       if (!payload.success || !Array.isArray(payload.data)) {
@@ -415,16 +393,17 @@ async function loadAllMatches() {
         `${allMatches.size} matches · ${scanOffset.toLocaleString()} events scanned` +
         (scanFinished ? " · Scan complete" : " · Loading next page…");
 
-      // Yield so Safari can paint and process WebSocket messages between pages.
-      if (!scanFinished) await new Promise(resolve => setTimeout(resolve, 15));
+      if (!scanFinished) {
+        await new Promise(resolve => setTimeout(resolve,15));
+      }
     }
   } catch (error) {
     if (error.name !== "AbortError" && generation === scanGeneration) {
-      $("progress").textContent = `Loading error: ${error.message}. Tap Refresh to retry.`;
+      $("progress").textContent =
+        `Loading error: ${error.message}. Tap Refresh to retry.`;
     }
   } finally {
     if (generation === scanGeneration) {
-      scanRunning = false;
       scanController = null;
       scanFinished = true;
       scheduleRender();
@@ -444,66 +423,130 @@ function bestFromBook(values, side) {
 }
 
 function updateToken(tokenId, update) {
-  if (!tokenId || !tokenToMatch.has(tokenId)) return;
+  if (!tokenId || !tokenToMatch.has(tokenId)) return null;
 
   const old = getPrice(tokenId);
   const next = {...old};
   let changed = false;
 
   for (const side of ["bid","ask"]) {
-    if (update[side] === undefined || update[side] === null || update[side] === "") {
-      continue;
+    if (!Object.prototype.hasOwnProperty.call(update,side)) continue;
+
+    const raw = update[side];
+    const n = raw == null || raw === "" ? NaN : Number(raw);
+    const value = Number.isFinite(n) && n > 0 && n < 1 ? n : null;
+
+    if (next[side] !== value) {
+      next[side] = value;
+      changed = true;
     }
-
-    const value = Number(update[side]);
-    const valid = Number.isFinite(value) && value > 0 && value < 1;
-    const price = valid ? value : null;
-
-    if (next[side] !== price) changed = true;
-    next[side] = price;
   }
 
-  if (!changed) return;
+  if (!changed) return null;
 
   next.updatedAt = Date.now();
   books.set(tokenId,next);
 
-  const match = allMatches.get(tokenToMatch.get(tokenId));
-  if (match) match.lastPriceAt = Date.now();
+  const matchId = tokenToMatch.get(tokenId);
+  const match = allMatches.get(matchId);
+  if (match) match.lastPriceAt = next.updatedAt;
+
+  return matchId;
+}
+
+function renderChangedMatches(changedIds, startedAt) {
+  for (const id of changedIds) {
+    let oldCard = null;
+
+    for (const card of matchesEl.children) {
+      if (card.dataset.id === id) {
+        oldCard = card;
+        break;
+      }
+    }
+
+    if (!oldCard) continue;
+
+    const match = allMatches.get(id);
+    if (!match) continue;
+
+    const fragment = document.createRange()
+      .createContextualFragment(renderCard(match));
+
+    const newCard = fragment.firstElementChild;
+    if (newCard) oldCard.replaceWith(newCard);
+  }
+
+  lastUiMs = performance.now() - startedAt;
+  $("uiTime").textContent = `UI ${lastUiMs.toFixed(2)}ms`;
 }
 
 function handleWsPayload(raw) {
+  const startedAt = performance.now();
+
   if (raw === "PONG" || raw === "pong" || raw === "PING") return;
 
   let parsed;
-  try { parsed = JSON.parse(raw); } catch { return; }
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  }
 
   const events = Array.isArray(parsed) ? parsed : [parsed];
+  const changedIds = new Set();
 
   for (const msg of events) {
     const type = String(msg.event_type || msg.type || "").toLowerCase();
 
     if (type === "book") {
-      updateToken(String(msg.asset_id || msg.assetId || ""), {
+      const id = String(msg.asset_id || msg.assetId || "");
+      const matchId = updateToken(id,{
         bid:bestFromBook(msg.bids,"bid"),
         ask:bestFromBook(msg.asks,"ask")
       });
+      if (matchId) changedIds.add(matchId);
+
     } else if (type === "best_bid_ask") {
-      updateToken(String(msg.asset_id || msg.assetId || ""), {
-        bid:msg.best_bid,
-        ask:msg.best_ask
-      });
+      const id = String(msg.asset_id || msg.assetId || "");
+      const update = {};
+
+      if ("best_bid" in msg) update.bid = msg.best_bid;
+      if ("best_ask" in msg) update.ask = msg.best_ask;
+
+      const matchId = updateToken(id,update);
+      if (matchId) changedIds.add(matchId);
+
     } else if (type === "price_change" && Array.isArray(msg.price_changes)) {
       for (const change of msg.price_changes) {
-        updateToken(String(change.asset_id || change.assetId || ""), {
-          bid:change.best_bid,
-          ask:change.best_ask
-        });
+        const id = String(change.asset_id || change.assetId || "");
+        const update = {};
+
+        if ("best_bid" in change) update.bid = change.best_bid;
+        if ("best_ask" in change) update.ask = change.best_ask;
+
+        const matchId = updateToken(id,update);
+        if (matchId) changedIds.add(matchId);
       }
     }
   }
 
-  scheduleRender();
+  if (changedIds.size) {
+    renderChangedMatches(changedIds,startedAt);
+  }
+}
+
+function planReconnect() {
+  clearTimeout(reconnectTimer);
+
+  reconnectCount++;
+  $("reconnects").textContent = `Reconnects ${reconnectCount}`;
+  setWsStatus("RECONNECTING");
+
+  const wait = reconnectDelay;
+  reconnectDelay = Math.min(reconnectDelay * 2,15000);
+
+  reconnectTimer = setTimeout(connectWebSocket,wait);
 }
 
 function connectWebSocket() {
@@ -520,23 +563,21 @@ function connectWebSocket() {
 
   setWsStatus("CONNECTING");
 
+  let socket;
   try {
-    ws = new WebSocket(CLOB_WS);
+    socket = new WebSocket(CLOB_WS);
+    ws = socket;
   } catch {
     setWsStatus("DISCONNECTED");
     planReconnect();
     return;
   }
 
-  const socket = ws;
-
-  socket.addEventListener("open", () => {
+  socket.addEventListener("open",() => {
     if (ws !== socket) return;
 
     reconnectDelay = 1000;
     setWsStatus("CONNECTED");
-
-    // Wait for valid token IDs if the match scan hasn't found any yet.
     syncTokenSubscriptions();
 
     pingTimer = setInterval(() => {
@@ -546,7 +587,7 @@ function connectWebSocket() {
     },10000);
   });
 
-  socket.addEventListener("message", event => {
+  socket.addEventListener("message",event => {
     if (ws !== socket) return;
 
     totalMessages++;
@@ -554,11 +595,11 @@ function connectWebSocket() {
     handleWsPayload(event.data);
   });
 
-  socket.addEventListener("error", () => {
+  socket.addEventListener("error",() => {
     if (ws === socket) setWsStatus("RECONNECTING");
   });
 
-  socket.addEventListener("close", () => {
+  socket.addEventListener("close",() => {
     if (ws !== socket) return;
 
     clearInterval(pingTimer);
@@ -572,28 +613,17 @@ function connectWebSocket() {
   });
 }
 
-function planReconnect() {
-  clearTimeout(reconnectTimer);
-  reconnectCount++;
-  $("reconnects").textContent = `Reconnects ${reconnectCount}`;
-  setWsStatus("RECONNECTING");
-
-  reconnectTimer = setTimeout(() => {
-    reconnectDelay = Math.min(reconnectDelay * 2,15000);
-    connectWebSocket();
-  },reconnectDelay);
-}
-
 $("sports").addEventListener("click",event => {
   const button = event.target.closest("[data-sport]");
   if (!button) return;
 
   chosenSport = button.dataset.sport;
+
   $("sports").querySelectorAll("[data-sport]").forEach(b =>
     b.classList.toggle("active",b === button)
   );
 
-  scheduleRender();
+  render();
   syncTokenSubscriptions();
 });
 
@@ -602,17 +632,18 @@ $("periods").addEventListener("click",event => {
   if (!button) return;
 
   chosenPeriod = button.dataset.period;
+
   $("periods").querySelectorAll("[data-period]").forEach(b =>
     b.classList.toggle("active",b === button)
   );
 
-  scheduleRender();
+  render();
   syncTokenSubscriptions();
 });
 
 $("search").addEventListener("input",event => {
   searchText = event.target.value.trim();
-  scheduleRender();
+  render();
   syncTokenSubscriptions();
 });
 
@@ -640,10 +671,10 @@ setInterval(() => {
 
   $("msgCount").textContent = `${totalMessages.toLocaleString()} messages`;
   $("msgRate").textContent = `${rate.toFixed(1)}/s`;
-  $("lastAge").textContent = `Last update ${lastMessageAt ? formatAge(now-lastMessageAt) : "—"}`;
+  $("lastAge").textContent =
+    `Last update ${lastMessageAt ? formatAge(now-lastMessageAt) : "—"}`;
 },1000);
 
-// Only one WebSocket is opened. It is reused as filters and tokens change.
 connectWebSocket();
 loadAllMatches();
 </script>
