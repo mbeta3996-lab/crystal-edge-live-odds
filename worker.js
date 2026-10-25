@@ -113,9 +113,8 @@ function sendFetchRequest() {
   // The payload we send – the server expects a `cmd: 'fetch'` and the startTime.
   const payload = JSON.stringify({cmd: 'fetch', startTime});
 
-  // The socket may still be CONNECTING; `socket.readyState` can be 0 (CONNECTING)
-  // but `socket.send` works fine – the server will associate the response
-  // with the `startTime` we supplied.
+  // The socket may still be CONNECTING; `socket.send` works fine – the server
+  // will associate the response with the `startTime` we supplied.
   if (socket.readyState === WebSocket.OPEN) {
     socket.send(payload);
   } else {
