@@ -1,7 +1,11 @@
 
 const GAMMA = "https://gamma-api.polymarket.com";
 
-const CORS = {
+const ALLOWED_SPORTS = ["cricket", "tennis", "football"];
+const MAX_SCAN_PAGES = 10;
+const PAGE_SIZE = 100;
+
+const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
@@ -9,232 +13,228 @@ const CORS = {
   "Cache-Control": "no-store"
 };
 
-const SPORTS = ["cricket", "tennis", "football"];
-
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: CORS
+    headers: CORS_HEADERS
   });
 }
 
-function parseJSON(value, fallback = []) {
+function normalise(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/&amp;/g, "&")
+    .replace(/[’']/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function asArray(value) {
   if (Array.isArray(value)) return value;
-  if (typeof value !== "string") return fallback;
+  if (typeof value !== "string") return [];
+
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : fallback;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return fallback;
+    return [];
   }
 }
 
-function textOf(value) {
-  if (Array.isArray(value)) {
-    return value.map(textOf).join(" ");
+function getMarketTokens(market) {
+  const tokens = [];
+
+  // Standard Gamma market format
+  const ids = asArray(market.clobTokenIds);
+  for (const id of ids) {
+    if (id != null && String(id).trim()) {
+      tokens.push(String(id));
+    }
   }
-  if (value && typeof value === "object") {
-    return Object.values(value).map(textOf).join(" ");
+
+  // Some responses provide token IDs inside outcomes
+  const outcomes = asArray(market.outcomes);
+  for (const outcome of outcomes) {
+    if (outcome && typeof outcome === "object") {
+      const id = outcome.tokenId ?? outcome.token_id;
+      if (id != null && String(id).trim()) {
+        tokens.push(String(id));
+      }
+    }
   }
-  return String(value ?? "");
+
+  return [...new Set(tokens)];
 }
 
-function sportOf(event) {
-  const text = [
+function eventText(event) {
+  const parts = [
     event.title,
     event.slug,
     event.description,
-    event.category,
-    event.subcategory,
-    event.sport,
-    textOf(event.tags),
-    textOf(event.series)
-  ].join(" ").toLowerCase();
+    event.ticker,
+    event.series?.title
+  ];
 
-  if (
-    /\b(cricket|ipl|t20|odi|test match|wpl|big bash|county cricket|ranji|cpl|psl|ashes)\b/.test(text)
-  ) return "cricket";
+  for (const tag of event.tags || []) {
+    if (typeof tag === "string") parts.push(tag);
+    else if (tag && typeof tag === "object") {
+      parts.push(tag.label, tag.slug, tag.name);
+    }
+  }
 
-  if (
-    /\b(tennis|atp|wta|challenger|grand slam|wimbledon|roland garros|us open tennis|australian open tennis)\b/.test(text)
-  ) return "tennis";
+  return normalise(parts.filter(Boolean).join(" "));
+}
 
-  if (
-    /\b(football|soccer|premier league|champions league|europa league|la liga|serie a|bundesliga|ligue 1|mls|fifa|uefa|world cup qualifiers|fa cup|copa america|eredivisie)\b/.test(text)
-  ) return "football";
+function detectSport(event) {
+  const text = eventText(event);
+
+  // Avoid finance, politics and unrelated price predictions.
+  const blocked = [
+    "bitcoin", "ethereum", "crypto", "stock price",
+    "s&p 500", "nasdaq", "dow jones", "gold price",
+    "presidential election", "election winner",
+    "federal reserve", "fomc", "interest rate",
+    "ballon d'or", "ballon dor", "player of the year",
+    "league winner", "champion outright", "to win the league",
+    "season winner", "outright", "top scorer award"
+  ];
+
+  if (blocked.some(term => text.includes(term))) return null;
+
+  const cricketTerms = [
+    "cricket", "ipl", "t20", "odi", "test match",
+    "big bash", "bbl", "psl", "cpl", "the hundred",
+    "ranji trophy", "wpl", "ashes"
+  ];
+
+  const tennisTerms = [
+    "tennis", "atp", "wta", "grand slam",
+    "wimbledon", "roland garros", "french open",
+    "us open", "australian open", "challenger"
+  ];
+
+  const footballTerms = [
+    "football", "soccer", "premier league",
+    "champions league", "europa league", "la liga",
+    "serie a", "bundesliga", "ligue 1",
+    "mls", "fa cup", "world cup", "epl",
+    "uefa", "fifa", "eredivisie"
+  ];
+
+  const has = terms => terms.some(term => text.includes(term));
+
+  // Prefer explicit cricket/tennis indicators before football.
+  if (has(cricketTerms)) return "cricket";
+  if (has(tennisTerms)) return "tennis";
+  if (has(footballTerms)) return "football";
 
   return null;
 }
 
-function isExcluded(event) {
-  const title = String(event.title || "").toLowerCase();
-  const slug = String(event.slug || "").toLowerCase();
-  const text = title + " " + slug;
-
-  if (event.active === false || event.closed === true) return true;
-
-  if (/\b(election|president|congress|senate|bitcoin|ethereum|crypto|stock|nasdaq|s&p 500|fomc|interest rate|fed decision|ballon d'or|ballon dor)\b/.test(text)) {
-    return true;
-  }
-
-  if (/\b(champion|winner of the tournament|season winner|league winner|to win the league|outright|top scorer|relegated|promotion)\b/.test(text)) {
-    return true;
-  }
-
-  return false;
-}
-
 function isMatchEvent(event) {
-  const title = String(event.title || "").trim();
+  const title = normalise(event.title);
+  if (!title) return false;
 
-  // Require a head-to-head style matchup.
-  return /\b(vs\.?|versus|v\.)\b| @ /.test(title);
+  const blocked = [
+    "champion", "championship winner", "league winner",
+    "season winner", "top scorer", "relegated",
+    "qualify for", "win the tournament",
+    "most valuable player", "mvp", "award"
+  ];
+
+  if (blocked.some(term => title.includes(term))) return false;
+
+  // Match-style titles, including "A vs. B", "A v B"
+  // and common tennis/cricket event title formats.
+  const hasVersus = /\b(vs?\.?|versus)\b/i.test(title);
+
+  // Some genuine events use a dash or "at" between opponents.
+  const hasOpponentSeparator =
+    /\s[-–—]\s/.test(title) ||
+    /\s@\s/.test(title);
+
+  return hasVersus || hasOpponentSeparator;
 }
 
-function getMarkets(event) {
-  let markets = parseJSON(event.markets, []);
+function isUsableMarket(market) {
+  if (!market || market.closed === true) return false;
+  if (market.active === false) return false;
+  if (market.archived === true) return false;
 
-  if (!markets.length && Array.isArray(event.markets)) {
-    markets = event.markets;
-  }
-
-  return markets;
+  const tokens = getMarketTokens(market);
+  return tokens.length >= 2;
 }
 
-function getTokenIds(market) {
-  let ids = parseJSON(
-    market.clobTokenIds ??
-    market.clob_token_ids ??
-    market.tokenIds ??
-    market.tokens,
-    []
-  );
-
-  if (!ids.length && Array.isArray(market.tokens)) {
-    ids = market.tokens.map(token =>
-      typeof token === "object"
-        ? token.token_id || token.tokenId || token.id
-        : token
-    );
-  }
-
-  return ids.map(id => {
-    if (id && typeof id === "object") {
-      return String(id.token_id || id.tokenId || id.id || "");
-    }
-    return String(id || "");
-  }).filter(Boolean);
-}
-
-function getOutcomes(market) {
-  return parseJSON(market.outcomes, []);
-}
-
-function chooseWinnerMarket(event) {
-  const markets = getMarkets(event);
-
-  const usable = markets.filter(market => {
-    const ids = getTokenIds(market);
-    const outcomes = getOutcomes(market);
-    return (
-      market.active !== false &&
-      market.closed !== true &&
-      ids.length >= 2 &&
-      outcomes.length >= 2
-    );
-  });
-
-  if (!usable.length) return null;
-
-  const winnerPattern = /\b(match winner|moneyline|to win|winner|who will win|winning team)\b/i;
-
-  return (
-    usable.find(market =>
-      winnerPattern.test(
-        String(market.question || market.groupItemTitle || "")
-      )
-    ) || usable[0]
-  );
-}
-
-function normalizeEvent(event) {
-  const sport = sportOf(event);
-  if (!sport || isExcluded(event) || !isMatchEvent(event)) return null;
-
-  const market = chooseWinnerMarket(event);
-  if (!market) return null;
-
-  const tokenIds = getTokenIds(market);
-  const outcomes = getOutcomes(market);
-
-  const outcomeTokens = outcomes.map((outcome, index) => ({
-    name: String(outcome),
-    tokenId: tokenIds[index] || null
-  }));
+function marketSummary(market) {
+  const tokens = getMarketTokens(market);
 
   return {
-    id: String(event.id || ""),
-    title: String(event.title || ""),
-    slug: String(event.slug || ""),
-    sport,
-    startDate: event.startDate || event.startDateIso || null,
-    endDate: event.endDate || null,
-    active: event.active !== false,
-    closed: event.closed === true,
-    url: event.slug
-      ? "https://polymarket.com/event/" + event.slug
-      : null,
-    image: event.image || event.icon || null,
-    marketId: String(market.id || ""),
-    marketQuestion: String(market.question || event.title || ""),
-    outcomes: outcomeTokens,
-    tokenIds,
-    marketSlug: market.slug || null
+    id: market.id ?? null,
+    question: market.question ?? market.groupItemTitle ?? "",
+    slug: market.slug ?? null,
+    active: market.active !== false,
+    closed: market.closed === true,
+    acceptingOrders: market.acceptingOrders ?? null,
+    enableOrderBook: market.enableOrderBook ?? null,
+    outcomes: asArray(market.outcomes),
+    outcomePrices: asArray(market.outcomePrices),
+    clobTokenIds: tokens,
+    bestBid: market.bestBid ?? null,
+    bestAsk: market.bestAsk ?? null,
+    spread: market.spread ?? null,
+    liquidity: market.liquidity ?? null,
+    volume: market.volume ?? null
   };
 }
 
-function matchesWindow(event, windowName) {
-  if (!windowName || windowName === "all" || windowName === "upcoming") {
-    return true;
-  }
+function eventSummary(event) {
+  const sport = detectSport(event);
+  const markets = (event.markets || [])
+    .filter(isUsableMarket)
+    .map(marketSummary);
 
-  const start = event.startDate ? Date.parse(event.startDate) : NaN;
-  if (!Number.isFinite(start)) return windowName !== "live";
+  const allTokens = [
+    ...new Set(markets.flatMap(market => market.clobTokenIds))
+  ];
 
-  const now = Date.now();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const afterTomorrow = new Date(tomorrow);
-  afterTomorrow.setDate(afterTomorrow.getDate() + 1);
-
-  if (windowName === "live") {
-    return start <= now && now - start < 8 * 60 * 60 * 1000;
-  }
-
-  if (windowName === "today") {
-    return start >= today.getTime() && start < tomorrow.getTime();
-  }
-
-  if (windowName === "tomorrow") {
-    return start >= tomorrow.getTime() && start < afterTomorrow.getTime();
-  }
-
-  if (windowName === "upcoming") {
-    return start >= now;
-  }
-
-  return true;
+  return {
+    id: String(event.id ?? ""),
+    title: event.title ?? "",
+    slug: event.slug ?? "",
+    description: event.description ?? "",
+    sport,
+    startDate: event.startDate ?? null,
+    endDate: event.endDate ?? null,
+    active: event.active !== false,
+    closed: event.closed === true,
+    archived: event.archived === true,
+    live: event.live ?? null,
+    eventUrl: event.slug
+      ? `https://polymarket.com/event/${event.slug}`
+      : null,
+    marketCount: markets.length,
+    tokenIds: allTokens,
+    markets
+  };
 }
 
-async function fetchGammaPage(offset, limit = 100) {
-  const url = new URL(GAMMA + "/events");
+function isEligible(event) {
+  if (!event || event.active === false) return false;
+  if (event.closed === true || event.archived === true) return false;
+
+  if (!detectSport(event)) return false;
+  if (!isMatchEvent(event)) return false;
+
+  const markets = (event.markets || []).filter(isUsableMarket);
+  return markets.length > 0;
+}
+
+async function fetchPage(offset) {
+  const url = new URL(`${GAMMA}/events`);
+
   url.searchParams.set("active", "true");
   url.searchParams.set("closed", "false");
-  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("limit", String(PAGE_SIZE));
   url.searchParams.set("offset", String(offset));
   url.searchParams.set("order", "startDate");
   url.searchParams.set("ascending", "true");
@@ -244,215 +244,242 @@ async function fetchGammaPage(offset, limit = 100) {
   });
 
   if (!response.ok) {
-    throw new Error("Gamma API returned HTTP " + response.status);
+    throw new Error(`Polymarket Gamma returned HTTP ${response.status}`);
   }
 
   const data = await response.json();
   return Array.isArray(data) ? data : [];
 }
 
-async function fetchEvents(query) {
-  const q = String(query.q || "").trim().toLowerCase();
-  const requestedSport = String(query.sport || "all").toLowerCase();
-  const windowName = String(query.window || "all").toLowerCase();
+async function scanEvents() {
+  const pages = [];
 
-  if (requestedSport !== "all" && !SPORTS.includes(requestedSport)) {
-    throw new Error("Unsupported sport. Use cricket, tennis, football or all.");
+  // Parallel requests reduce the time spent waiting for Gamma.
+  for (let offset = 0; offset < MAX_SCAN_PAGES * PAGE_SIZE; offset += PAGE_SIZE) {
+    pages.push(offset);
   }
 
-  // Scan more pages for a search query than for the default listing.
-  const maxPages = q ? 30 : 10;
-  const pageSize = 100;
-  const all = [];
-  const seen = new Set();
-  let pagesScanned = 0;
+  const results = await Promise.allSettled(
+    pages.map(offset => fetchPage(offset))
+  );
 
-  // Fetch pages in small batches to reduce rate-limit risk.
-  for (let offset = 0; offset < maxPages * pageSize; offset += pageSize * 3) {
-    const offsets = [
-      offset,
-      offset + pageSize,
-      offset + pageSize * 2
-    ].filter(n => n < maxPages * pageSize);
+  const allEvents = [];
+  const errors = [];
 
-    const results = await Promise.all(
-      offsets.map(n =>
-        fetchGammaPage(n, pageSize).catch(() => [])
-      )
-    );
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
 
-    pagesScanned += results.length;
-
-    let foundAny = false;
-
-    for (const page of results) {
-      if (page.length) foundAny = true;
-
-      for (const event of page) {
-        const id = String(event.id || event.slug || "");
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        all.push(event);
-      }
-    }
-
-    if (!foundAny || results.some(page => page.length < pageSize)) {
-      break;
+    if (result.status === "fulfilled") {
+      allEvents.push(...result.value);
+    } else {
+      errors.push({
+        offset: pages[i],
+        message: String(result.reason?.message || result.reason)
+      });
     }
   }
 
-  const normalized = all
-    .map(normalizeEvent)
-    .filter(Boolean)
-    .filter(event =>
-      requestedSport === "all" || event.sport === requestedSport
-    )
-    .filter(event => q ? true : matchesWindow(event, windowName))
-    .filter(event => {
-      if (!q) return true;
+  const unique = new Map();
 
-      const haystack = [
-        event.title,
-        event.slug,
-        event.marketQuestion,
-        event.sport
-      ].join(" ").toLowerCase();
-
-      return q.split(/\s+/).every(term => haystack.includes(term));
-    });
-
-  normalized.sort((a, b) => {
-    const at = Date.parse(a.startDate || "") || 0;
-    const bt = Date.parse(b.startDate || "") || 0;
-    return at - bt;
-  });
+  for (const event of allEvents) {
+    if (event?.id != null) unique.set(String(event.id), event);
+  }
 
   return {
-    success: true,
-    source: "Polymarket Gamma",
-    sport: requestedSport,
-    query: q || null,
-    count: normalized.length,
-    pagesScanned,
-    eventsScanned: all.length,
-    matches: normalized.slice(0, q ? 100 : 60)
+    events: [...unique.values()],
+    scanned: allEvents.length,
+    uniqueCount: unique.size,
+    errors
   };
 }
 
-async function fetchEventById(id) {
-  if (!id) return json({ success: false, error: "Missing event id" }, 400);
-
-  const url = new URL(GAMMA + "/events");
-  url.searchParams.set("id", id);
+async function getEventById(id) {
+  const url = new URL(`${GAMMA}/events`);
+  url.searchParams.set("id", String(id));
 
   const response = await fetch(url.toString(), {
     headers: { Accept: "application/json" }
   });
 
   if (!response.ok) {
-    return json({
-      success: false,
-      error: "Gamma API returned HTTP " + response.status
-    }, 502);
+    throw new Error(`Polymarket Gamma returned HTTP ${response.status}`);
   }
 
   const data = await response.json();
-  const event = Array.isArray(data) ? data[0] : data;
-
-  if (!event) {
-    return json({ success: false, error: "Event not found" }, 404);
+  if (Array.isArray(data)) {
+    return data.find(event => String(event.id) === String(id)) || null;
   }
 
-  const markets = getMarkets(event).map(market => ({
-    id: String(market.id || ""),
-    question: market.question || "",
-    slug: market.slug || null,
-    active: market.active !== false,
-    closed: market.closed === true,
-    outcomes: getOutcomes(market),
-    tokenIds: getTokenIds(market)
-  }));
+  return data && String(data.id) === String(id) ? data : null;
+}
 
-  return json({
-    success: true,
-    id: String(event.id || id),
-    title: event.title || "",
-    slug: event.slug || "",
-    url: event.slug
-      ? "https://polymarket.com/event/" + event.slug
-      : null,
-    markets
-  });
+async function handleRequest(request) {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: CORS_HEADERS
+    });
+  }
+
+  if (request.method !== "GET") {
+    return json({ success: false, error: "Method not allowed" }, 405);
+  }
+
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  const startedAt = Date.now();
+
+  try {
+    if (path === "/" || path === "/health") {
+      return json({
+        success: true,
+        status: "ok",
+        worker: "crystal-live-odds",
+        provider: "Polymarket Gamma + public CLOB",
+        gamma: GAMMA,
+        allowedSports: ALLOWED_SPORTS,
+        pageSize: PAGE_SIZE,
+        maxScanPages: MAX_SCAN_PAGES,
+        endpoints: [
+          "/health",
+          "/sports",
+          "/matches?limit=100&offset=0&sport=all",
+          "/events",
+          "/event?id=EVENT_ID"
+        ],
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (path === "/sports") {
+      return json({
+        success: true,
+        sports: ALLOWED_SPORTS
+      });
+    }
+
+    if (path === "/event") {
+      const id = url.searchParams.get("id");
+
+      if (!id) {
+        return json({
+          success: false,
+          error: "Missing event id. Use /event?id=EVENT_ID"
+        }, 400);
+      }
+
+      const event = await getEventById(id);
+
+      if (!event) {
+        return json({
+          success: false,
+          error: "Event not found",
+          id
+        }, 404);
+      }
+
+      return json({
+        success: true,
+        worker: "crystal-live-odds",
+        data: eventSummary(event),
+        requestMs: Date.now() - startedAt
+      });
+    }
+
+    if (path === "/matches" || path === "/events") {
+      const sportParam = normalise(url.searchParams.get("sport") || "all");
+      const search = normalise(url.searchParams.get("q") || "");
+      const limit = Math.max(
+        1,
+        Math.min(200, Number.parseInt(url.searchParams.get("limit") || "100", 10) || 100)
+      );
+      const offset = Math.max(
+        0,
+        Number.parseInt(url.searchParams.get("offset") || "0", 10) || 0
+      );
+
+      if (sportParam !== "all" && !ALLOWED_SPORTS.includes(sportParam)) {
+        return json({
+          success: false,
+          error: "Unsupported sport",
+          allowedSports: ["all", ...ALLOWED_SPORTS]
+        }, 400);
+      }
+
+      const scan = await scanEvents();
+
+      let matches = scan.events.filter(isEligible);
+
+      if (sportParam !== "all") {
+        matches = matches.filter(event => detectSport(event) === sportParam);
+      }
+
+      if (search) {
+        matches = matches.filter(event =>
+          eventText(event).includes(search)
+        );
+      }
+
+      matches.sort((a, b) => {
+        const dateA = Date.parse(a.startDate || "");
+        const dateB = Date.parse(b.startDate || "");
+
+        if (Number.isFinite(dateA) && Number.isFinite(dateB)) {
+          return dateA - dateB;
+        }
+
+        return 0;
+      });
+
+      const totalMatchesFound = matches.length;
+      const data = matches
+        .slice(offset, offset + limit)
+        .map(eventSummary);
+
+      return json({
+        success: true,
+        worker: "crystal-live-odds",
+        source: "Polymarket Gamma",
+        sport: sportParam,
+        allowedSports: ALLOWED_SPORTS,
+        count: data.length,
+        totalMatchesFound,
+        scannedEvents: scan.scanned,
+        uniqueEvents: scan.uniqueCount,
+        limit,
+        offset,
+        requestMs: Date.now() - startedAt,
+        timestamp: new Date().toISOString(),
+        warnings: scan.errors,
+        data
+      });
+    }
+
+    return json({
+      success: false,
+      error: "Endpoint not found",
+      availableEndpoints: [
+        "/health",
+        "/sports",
+        "/matches",
+        "/events",
+        "/event?id=EVENT_ID"
+      ]
+    }, 404);
+
+  } catch (error) {
+    return json({
+      success: false,
+      worker: "crystal-live-odds",
+      error: String(error?.message || error),
+      requestMs: Date.now() - startedAt,
+      timestamp: new Date().toISOString()
+    }, 502);
+  }
 }
 
 export default {
   async fetch(request) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: CORS });
-    }
-
-    if (request.method !== "GET") {
-      return json({ success: false, error: "GET only" }, 405);
-    }
-
-    const url = new URL(request.url);
-    const path = url.pathname.replace(/\/+$/, "") || "/";
-
-    try {
-      if (path === "/" || path === "/health") {
-        return json({
-          success: true,
-          status: "ok",
-          worker: "crystal-edge-polymarket",
-          source: "Polymarket Gamma",
-          allowedSports: SPORTS,
-          endpoints: [
-            "/health",
-            "/matches?sport=all",
-            "/matches?sport=cricket",
-            "/matches?sport=tennis",
-            "/matches?sport=football",
-            "/matches?sport=all&q=India",
-            "/event?id=EVENT_ID"
-          ]
-        });
-      }
-
-      if (path === "/matches" || path === "/sports") {
-        const result = await fetchEvents({
-          sport: url.searchParams.get("sport") || "all",
-          window: url.searchParams.get("window") || "all",
-          q: url.searchParams.get("q") || ""
-        });
-
-        return json(result);
-      }
-
-      if (path === "/events") {
-        const result = await fetchEvents({
-          sport: url.searchParams.get("sport") || "all",
-          window: url.searchParams.get("window") || "all",
-          q: url.searchParams.get("q") || ""
-        });
-
-        return json(result);
-      }
-
-      if (path === "/event") {
-        return await fetchEventById(url.searchParams.get("id"));
-      }
-
-      return json({
-        success: false,
-        error: "Unknown endpoint",
-        available: ["/health", "/matches", "/events", "/event?id=EVENT_ID"]
-      }, 404);
-    } catch (error) {
-      return json({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error"
-      }, 500);
-    }
+    return handleRequest(request);
   }
 };
-
