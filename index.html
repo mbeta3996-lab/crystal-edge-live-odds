@@ -1,471 +1,67 @@
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b1020">
-<title>CRYSTAL EDGE</title>
+<meta charset="UTF-8">
+<title>Odds Dashboard – Cricket, Soccer, Tennis</title>
 <style>
-:root{color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;background:#080c16;color:#edf2ff;font:14px -apple-system,BlinkMacSystemFont,sans-serif}
-main{max-width:760px;margin:auto;padding:15px 12px 30px}
-header,.filters,.line{display:flex;align-items:center;gap:8px}
-header,.line{justify-content:space-between}
-header{margin-bottom:18px}
-.brand{font-size:15px;font-weight:800;letter-spacing:1px}
-button,input{font:inherit;color:inherit;background:#111827;border:1px solid #263248;border-radius:9px;min-height:39px;padding:0 11px}
-button{cursor:pointer}
-button.active{background:#e8efff;color:#111827;border-color:#e8efff}
-.refresh{width:40px;font-size:20px}
-form{display:flex;gap:8px;margin-bottom:12px}
-input{width:100%;min-width:0;background:#0d1321}
-.filters{flex-wrap:wrap;margin:10px 0}
-#status{font-size:11px;color:#98a6bd}
-.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#e3a23e;margin-right:5px}
-.dot.on{background:#37d89a}
-#matches{margin-top:14px}
-.match{background:#0d1321;border:1px solid #202b40;border-radius:12px;padding:12px;margin-bottom:10px}
-.title{font-size:14px;font-weight:700;line-height:1.4;overflow-wrap:anywhere}
-.sub{font-size:11px;color:#8998b2;margin-top:5px}
-.outcomes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-.outcome{min-width:0;border:1px solid #263248;background:#101827;border-radius:9px;padding:10px}
-.name{font-size:12px;color:#c7d2e7;min-height:30px;overflow-wrap:anywhere}
-.prices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.label{font-size:10px;color:#8190a9;margin-bottom:5px}
-.price{font-size:16px;font-weight:750;font-variant-numeric:tabular-nums}
-.buy{color:#72d9b0}.sell{color:#ff9c9c}
-.line{margin-top:11px}
-.link{font-size:11px;color:#b8c8ff;text-decoration:none}
-.watch{min-height:31px;font-size:11px}
-#empty{font-size:12px;color:#8998b2;padding:14px 2px}
-@media(max-width:380px){main{padding:12px 8px}.match{padding:9px}.outcome{padding:7px}.price{font-size:14px}}
+  body {font-family:Arial,Helvetica,sans-serif; margin:0; padding:0; background:#fafafa;}
+  header {background:#333; color:#fff; padding:0.8rem 1rem; text-align:center;}
+  #search {margin:0.5rem 0; padding:0.4rem; width:80%; max-width:400px;}
+  #refresh {margin-left:0.5rem; padding:0.4rem 0.8rem;}
+  #matches {list-style:none; padding:0; margin:0;}
+  #matches li {border-bottom:1px solid #ddd; padding:0.6rem 1rem;}
+  #matches li span {font-weight:bold;}
 </style>
 </head>
 <body>
-<main>
 <header>
-<div class="brand">◇ CRYSTAL EDGE</div>
-<button class="refresh" id="refresh" aria-label="Refresh">↻</button>
+  <h1>Live Odds – Cricket / Soccer / Tennis</h1>
+  <input id="search" type="text" placeholder="Search team / match…">
+  <button id="refresh">Refresh</button>
 </header>
 
-<form id="searchForm">
-<input id="q" type="search" placeholder="Search match or player" autocomplete="off">
-<button type="submit">Search</button>
-</form>
-
-<div class="filters" id="sports">
-<button class="active" data-sport="cricket">Cricket</button>
-<button data-sport="tennis">Tennis</button>
-<button data-sport="soccer">Soccer</button>
-</div>
-
-<div class="filters" id="windows">
-<button class="active" data-window="live">LIVE</button>
-<button data-window="today">TODAY</button>
-<span style="flex:1"></span>
-<span id="status"><span class="dot"></span>Connecting</span>
-</div>
-
-<section id="matches"></section>
-<div id="empty">Loading Polymarket markets…</div>
-</main>
+<ul id="matches"></ul>
 
 <script>
-"use strict";
-
-const GAMMA="https://gamma-api.polymarket.com";
-const SOCKET="wss://ws-subscriptions-clob.polymarket.com/ws/market";
-const state={
- sport:"cricket",
- window:"live",
- query:"",
- events:[],
- selected:null,
- socket:null,
- generation:0,
- retry:null,
- tokens:[],
- books:new Map(),
- packets:[],
- packetCount:0,
- lastPacket:0,
- reconnectDelay:1500
-};
-
-const $=id=>document.getElementById(id);
-
-function arr(v){
- if(Array.isArray(v))return v;
- if(typeof v==="string"){
-  try{
-   const x=JSON.parse(v);
-   return Array.isArray(x)?x:[];
-  }catch{}
- }
- return [];
-}
-
-function esc(v){
- return String(v??"").replace(/[&<>"']/g,c=>({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
- }[c]));
-}
-
-function dateOf(e){
- return Date.parse(e.startDate||e.startTime||e.gameStartTime||"")||0;
-}
-
-function classify(e){
- const text=[
-  e.sport,e.category,e.groupItemTitle,e.title,e.slug,
-  e.description,JSON.stringify(e.tags||[])
- ].join(" ").toLowerCase();
-
- if(/\b(cricket|ipl|t20|odi|test match)\b/.test(text))return "cricket";
- if(/\b(tennis|atp|wta|challenger)\b/.test(text))return "tennis";
- if(/\b(soccer|football|premier league|champions league|la liga|serie a|bundesliga|mls)\b/.test(text))return "soccer";
- return "";
-}
-
-function isMatch(e){
- const title=String(e.title||e.question||"");
- if(!/\b(vs\.?|versus)\b/i.test(title))return false;
- if(/bitcoin|ethereum|election|president|fomc|interest rate|stock market|s&p 500|ballon d'or/i.test(title))return false;
- return e.closed!==true&&e.archived!==true;
-}
-
-function getMarkets(e){
- return arr(e.markets);
-}
-
-function getTokens(m){
- const ids=arr(m.clobTokenIds||m.tokenIds);
- if(ids.length>=2)return ids.map(String);
-
- const outcomes=arr(m.outcomes);
- if(outcomes.length>=2&&outcomes.every(x=>x&&typeof x==="object"&&x.tokenId)){
-  return outcomes.map(x=>String(x.tokenId));
- }
- return [];
-}
-
-function getOutcomeNames(m){
- const outcomes=arr(m.outcomes);
- return outcomes.map(x=>typeof x==="object"
-  ?String(x.name||x.title||"Outcome")
-  :String(x));
-}
-
-function normalize(e){
- for(const m of getMarkets(e)){
-  const tokens=getTokens(m);
-  const names=getOutcomeNames(m);
-  if(tokens.length<2||names.length<2)continue;
-
-  return {
-   id:String(e.id||e.slug||e.title),
-   title:String(e.title||e.question||"Match"),
-   sport:classify(e),
-   start:dateOf(e),
-   tokens:tokens.slice(0,2),
-   names:names.slice(0,2),
-   url:e.url||(e.slug?"https://polymarket.com/event/"+e.slug:"")
+/* Register the worker – it will start the socket and forward filtered odds */
+if (window.Worker) {
+  const worker = new Worker('worker.js');
+  worker.onmessage = e => {
+    // e.data = { sport, teams, odds } – already filtered
+    renderMatches(e.data);
   };
- }
- return null;
+  // Auto‑refresh every 30 s (you can change the interval)
+  setInterval(() => worker.postMessage({cmd:'fetch'}), 30_000);
+  // Manual refresh button
+  document.getElementById('refresh').onclick = () => worker.postMessage({cmd:'fetch'});
+  // Search bar – filters the displayed list client‑side
+  const list = document.getElementById('matches');
+  const searchBox = document.getElementById('search');
+  searchBox.addEventListener('input', () => {
+    const term = searchBox.value.trim().toLowerCase();
+    const items = list.querySelectorAll('li');
+    items.forEach(li => {
+      const txt = li.textContent.toLowerCase();
+      li.style.display = txt.includes(term) ? '' : 'none';
+    });
+  });
 }
 
-function visibleMatches(){
- const now=Date.now();
- const today=new Date(now).toDateString();
-
- return state.events.map(normalize).filter(Boolean).filter(m=>{
-  if(m.sport!==state.sport)return false;
-
-  const e=state.events.find(x=>String(x.id||x.slug||x.title)===m.id);
-  if(!e||!isMatch(e))return false;
-
-  if(state.window==="today"){
-   if(!m.start||new Date(m.start).toDateString()!==today)return false;
-  }else{
-   const end=Date.parse(e.endDate||e.endTime||"")||0;
-   const explicitlyLive=e.live===true||e.isLive===true;
-   const inProgress=m.start>0&&m.start<=now&&(!end||end>=now);
-   if(!explicitlyLive&&!inProgress)return false;
-  }
-
-  const q=state.query.trim().toLowerCase();
-  return !q||(m.title+" "+m.names.join(" ")).toLowerCase().includes(q);
- }).sort((a,b)=>a.start-b.start);
+/* Render the odds received from the worker */
+function renderMatches(data) {
+  const ul = document.getElementById('matches');
+  ul.innerHTML = '';                     // clear previous rows
+  if (!data || !data.matches) return;
+  data.matches.forEach(m => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span>${m.home} vs ${m.away}</span>
+      <strong>${m.sport.toUpperCase()}:</strong>
+      ${m.homeOdds} / ${m.awayOdds}
+    `;
+    ul.appendChild(li);
+  });
 }
-
-async function loadMatches(){
- $("empty").textContent="Loading Polymarket markets…";
- try{
-  const all=[];
-  for(let offset=0;offset<1000;offset+=100){
-   const u=new URL(GAMMA+"/events");
-   u.searchParams.set("limit","100");
-   u.searchParams.set("offset",String(offset));
-   u.searchParams.set("active","true");
-   u.searchParams.set("closed","false");
-
-   const r=await fetch(u.toString(),{cache:"no-store"});
-   if(!r.ok)throw Error("Gamma HTTP "+r.status);
-
-   const data=await r.json();
-   if(!Array.isArray(data)||!data.length)break;
-   all.push(...data);
-   if(data.length<100)break;
-  }
-
-  state.events=all.filter(e=>classify(e)&&isMatch(e));
-  renderMatches();
-
-  if(!visibleMatches().length){
-   $("empty").textContent="No matching markets found for this filter.";
-  }
- }catch(err){
-  console.error(err);
-  $("empty").textContent="Could not load Polymarket data. Tap refresh.";
- }
-}
-
-function renderMatches(){
- const rows=visibleMatches();
-
- $("matches").innerHTML=rows.map(m=>{
-  const outcomes=m.tokens.map((token,i)=>{
-   const book=state.books.get(token)||{};
-   return `<div class="outcome">
-    <div class="name">${esc(m.names[i]||"Outcome")}</div>
-    <div class="prices">
-     <div><div class="label">BUY</div>
-      <div class="price buy" id="buy-${esc(token)}">${decimal(book.ask)}</div>
-     </div>
-     <div><div class="label">SELL</div>
-      <div class="price sell" id="sell-${esc(token)}">${decimal(book.bid)}</div>
-     </div>
-    </div>
-   </div>`;
-  }).join("");
-
-  return `<article class="match">
-   <div class="title">${esc(m.title)}</div>
-   <div class="sub">${m.start?esc(new Date(m.start).toLocaleString()):""}</div>
-   <div class="outcomes">${outcomes}</div>
-   <div class="line">
-    ${m.url?`<a class="link" href="${esc(m.url)}" target="_blank" rel="noopener">Polymarket ↗</a>`:"<span></span>"}
-    <button class="watch" type="button" data-watch="${esc(m.id)}">${state.selected?.id===m.id?"Watching":"Watch live"}</button>
-   </div>
-  </article>`;
- }).join("");
-
- $("empty").textContent=rows.length?"":"No matching markets found.";
-}
-
-function setStatus(label,connected=false){
- $("status").innerHTML=`<span class="dot ${connected?"on":""}"></span>${esc(label)}`;
-}
-
-function stopSocket(){
- state.generation++;
- clearTimeout(state.retry);
-
- if(state.socket){
-  state.socket.onopen=null;
-  state.socket.onmessage=null;
-  state.socket.onclose=null;
-  state.socket.onerror=null;
-  try{state.socket.close()}catch{}
- }
- state.socket=null;
- state.tokens=[];
- state.books.clear();
-}
-
-function selectMatch(id){
- const m=visibleMatches().find(x=>x.id===id);
- if(!m)return;
-
- stopSocket();
- state.selected=m;
- state.tokens=m.tokens.slice(0,2);
- renderMatches();
- connectSocket();
-}
-
-function connectSocket(){
- if(!state.selected||!state.tokens.length)return;
-
- const generation=state.generation;
- setStatus("Connecting");
-
- let ws;
- try{
-  ws=new WebSocket(SOCKET);
- }catch{
-  scheduleReconnect(generation);
-  return;
- }
-
- state.socket=ws;
-
- ws.onopen=()=>{
-  if(generation!==state.generation)return;
-  setStatus("Live connection",true);
-  ws.send(JSON.stringify({
-   type:"market",
-   assets_ids:state.tokens
-  }));
- };
-
- ws.onmessage=event=>{
-  if(generation!==state.generation)return;
-  capturePacket(event.data);
-
-  let data;
-  try{data=JSON.parse(event.data)}catch{return}
-  (Array.isArray(data)?data:[data]).forEach(handleMessage);
- };
-
- ws.onerror=()=>{
-  if(generation===state.generation)setStatus("Connection error");
- };
-
- ws.onclose=()=>{
-  if(generation!==state.generation)return;
-  scheduleReconnect(generation);
- };
-}
-
-function scheduleReconnect(generation){
- if(generation!==state.generation)return;
- setStatus("Reconnecting");
- state.retry=setTimeout(()=>{
-  if(generation===state.generation&&state.selected)connectSocket();
- },state.reconnectDelay);
-}
-
-function decimal(price){
- const p=Number(price);
- return Number.isFinite(p)&&p>0&&p<=1?(1/p).toFixed(3):"—";
-}
-
-function handleMessage(m){
- const type=String(m.event_type||m.type||"").toLowerCase();
-
- if(type==="price_change"&&Array.isArray(m.price_changes)){
-  for(const p of m.price_changes){
-   const token=String(p.asset_id||"");
-   if(state.tokens.includes(token)){
-    updateBook(token,p.best_ask,p.best_bid);
-   }
-  }
-  return;
- }
-
- const token=String(m.asset_id||m.token_id||"");
- if(!state.tokens.includes(token))return;
-
- if(type==="best_bid_ask"){
-  updateBook(token,m.best_ask,m.best_bid);
-  return;
- }
-
- if(type==="book"){
-  const bids=arr(m.bids);
-  const asks=arr(m.asks);
-
-  const bid=bids.reduce((best,x)=>Math.max(best,Number(x.price)||0),0);
-  const ask=asks.reduce((best,x)=>Math.min(best,Number(x.price)||Infinity),Infinity);
-
-  updateBook(token,Number.isFinite(ask)?ask:null,bid||null);
- }
-}
-
-function updateBook(token,ask,bid){
- if(!state.tokens.includes(token))return;
-
- const old=state.books.get(token)||{};
- const next={...old};
-
- if(ask!==undefined&&ask!==null&&ask!=="")next.ask=Number(ask);
- if(bid!==undefined&&bid!==null&&bid!=="")next.bid=Number(bid);
-
- state.books.set(token,next);
-
- const buy=$("buy-"+token);
- const sell=$("sell-"+token);
- if(buy)buy.textContent=decimal(next.ask);
- if(sell)sell.textContent=decimal(next.bid);
-}
-
-function capturePacket(raw){
- const now=performance.now();
- const interval=state.lastPacket?now-state.lastPacket:null;
- state.lastPacket=now;
-
- state.packetCount++;
- const text=typeof raw==="string"?raw:JSON.stringify(raw);
-
- state.packets.push({
-  n:state.packetCount,
-  receivedAt:new Date().toISOString(),
-  receivedMs:Date.now(),
-  intervalMs:interval===null?null:+interval.toFixed(3),
-  bytes:new TextEncoder().encode(text).length,
-  raw:text
- });
-
- if(state.packets.length>50000)state.packets.shift();
-}
-
-document.addEventListener("click",event=>{
- const sport=event.target.closest("[data-sport]");
- const windowButton=event.target.closest("[data-window]");
- const watch=event.target.closest("[data-watch]");
-
- if(sport){
-  state.sport=sport.dataset.sport;
-  document.querySelectorAll("[data-sport]").forEach(b=>
-   b.classList.toggle("active",b===sport));
-  renderMatches();
- }
-
- if(windowButton){
-  state.window=windowButton.dataset.window;
-  document.querySelectorAll("[data-window]").forEach(b=>
-   b.classList.toggle("active",b===windowButton));
-  renderMatches();
- }
-
- if(watch)selectMatch(watch.dataset.watch);
-});
-
-$("searchForm").addEventListener("submit",event=>{
- event.preventDefault();
- state.query=$("q").value;
- renderMatches();
-});
-
-$("q").addEventListener("input",()=>{
- state.query=$("q").value;
- renderMatches();
-});
-
-$("refresh").addEventListener("click",()=>{
- loadMatches();
- if(state.selected){
-  const id=state.selected.id;
-  setTimeout(()=>selectMatch(id),500);
- }
-});
-
-loadMatches();
-setInterval(loadMatches,60000);
 </script>
 </body>
 </html>
