@@ -1,418 +1,318 @@
 
-/* CRYSTAL EDGE — Browser Web Worker
-   Public Gamma event discovery + public Polymarket CLOB market feed.
-   No API keys, trading, fabricated odds, or third-party odds server.
-*/
-'use strict';
-
-const GAMMA = 'https://gamma-api.polymarket.com/events';
-const CLOB_WS = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
-const PAGE_SIZE = 100;
-const MAX_PAGES = 20;
-const ALLOWED = new Set(['cricket', 'tennis', 'soccer', 'basketball']);
+const GAMMA = "https://gamma-api.polymarket.com";
+const CLOB_WS = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
 
 let socket = null;
-let reconnectTimer = null;
-let heartbeat = null;
-let reconnectDelay = 1500;
-let loading = false;
-let packetCount = 0;
-let lastFetchMs = null;
-
 let matches = [];
-const quotes = new Map();
-const tokenOwners = new Map();
-const subscribed = new Set();
+let tokenMap = new Map();
+let books = new Map();
+let reconnectTimer = null;
+let stopped = false;
 
-function send(type, data = {}) {
+const send = (type, data = {}) =>
   self.postMessage({ type, ...data });
-}
 
-function array(value) {
+const arr = value => {
   if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
   try {
-    const result = JSON.parse(value || '[]');
-    return Array.isArray(result) ? result : [];
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
-}
+};
 
-function clean(value) {
-  return String(value ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-}
+const clean = value =>
+  String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
 function sportOf(event) {
-  const tags = Array.isArray(event.tags)
-    ? event.tags.map(t => typeof t === 'string' ? t : `${t.label || ''} ${t.slug || ''} ${t.name || ''}`).join(' ')
-    : '';
+  const s = [
+    event.sport,
+    event.category,
+    event.slug,
+    event.title,
+    event.description,
+    ...(event.tags || []).map(t => typeof t === "string" ? t : t.label || t.slug || "")
+  ].join(" ").toLowerCase();
 
-  const text = `${tags} ${event.sport || ''} ${event.category || ''} ${event.title || ''} ${event.slug || ''} ${event.description || ''}`.toLowerCase();
+  if (/cricket|ipl|t20|odi|test-match|ashes/.test(s)) return "cricket";
+  if (/tennis|atp-|wta-|grand-slam/.test(s)) return "tennis";
+  if (/basketball|nba|wnba|euroleague/.test(s)) return "basketball";
+  if (/soccer|football|premier-league|champions-league|la-liga|serie-a|bundesliga|mls/.test(s)) return "football";
+  return "";
+}
 
-  if (/\b(cricket|ipl|t20|odi|ashes|big bash|test match)\b/.test(text)) return 'cricket';
-  if (/\b(tennis|atp|wta|challenger|wimbledon|roland garros|us open|australian open)\b/.test(text)) return 'tennis';
-  if (/\b(basketball|nba|wnba|euroleague|ncaa basketball)\b/.test(text)) return 'basketball';
-  if (/\b(soccer|football|premier league|champions league|la liga|serie a|bundesliga|ligue 1|mls|fifa|uefa)\b/.test(text)) return 'soccer';
+function matchupOf(title) {
+  const t = clean(title);
+  if (!t || /\b(toss|most sixes|most fours|top scorer|player of the match|ballon d'or|champion|outright|election|bitcoin|ethereum|s&p 500)\b/i.test(t)) return null;
 
-  return null;
+  const parts = t.split(/\s+(?:vs\.?|versus|v\.)\s+/i);
+  if (parts.length < 2) return null;
+
+  const a = parts[parts.length - 2].replace(/^[\s:—-]+|[\s:—-]+$/g, "");
+  const b = parts[parts.length - 1].replace(/^[\s:—-]+|[\s:—-]+$/g, "");
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  if (!a || !b || norm(a) === norm(b)) return null;
+  return { home: a, away: b };
+}
+
+function isWinnerMarket(market, sport) {
+  const q = clean(market.question || market.groupItemTitle || "").toLowerCase();
+
+  if (!q) return false;
+  if (/\b(toss|most sixes|most fours|top scorer|player of the match|match double|double chance|correct score|total runs|total goals|total points|over\/under|handicap|spread|to qualify|set betting|exact score|first innings|first goal|corners|cards)\b/i.test(q)) return false;
+
+  if (/\b(draw|tie)\b/i.test(q)) return sport === "football" && /\b(win|winner|draw)\b/i.test(q);
+
+  return /\b(winner|win|to win|moneyline|match result|match winner)\b/i.test(q);
+}
+
+function parseEvent(event) {
+  if (event.closed === true || event.active === false) return [];
+  const sport = sportOf(event);
+  if (!sport) return [];
+
+  const matchup = matchupOf(event.title);
+  if (!matchup) return [];
+
+  const markets = Array.isArray(event.markets) ? event.markets : [];
+  const output = [];
+
+  for (const m of markets) {
+    if (m.closed === true || m.active === false || !isWinnerMarket(m, sport)) continue;
+
+    const outcomes = arr(m.outcomes);
+    const ids = arr(m.clobTokenIds);
+    if (outcomes.length < 2 || ids.length < 2 || outcomes.length !== ids.length) continue;
+
+    const selections = outcomes.map((name, i) => ({
+      name: clean(name),
+      tokenId: String(ids[i] || "")
+    })).filter(x => x.name && x.tokenId);
+
+    if (selections.length < 2) continue;
+
+    const id = String(m.id || m.conditionId || `${event.id}-${output.length}`);
+    output.push({
+      id,
+      eventId: String(event.id || ""),
+      title: clean(event.title),
+      home: matchup.home,
+      away: matchup.away,
+      sport,
+      startTime: event.startTime || event.startDate || event.gameStartTime || null,
+      url: event.slug ? `https://polymarket.com/event/${event.slug}` : "",
+      question: clean(m.question || m.groupItemTitle || event.title),
+      marketId: id,
+      selections,
+      quotes: {}
+    });
   }
-function isMatchTitle(title) {
-  if (!title) return false;
-
-  const text = String(title).trim();
-
-  if (/\b(toss|most sixes|most fours|top scorer|player of the match|match double|double chance|correct score|outright|champion|ballon d'or|bitcoin|ethereum|s&p 500)\b/i.test(text)) {
-    return false;
-  }
-
-  const matches = text.match(/\b(.+?)\s+(?:vs?\.?|versus)\s+(.+?)\b/i);
-  if (!matches) return false;
-
-  const normalize = s =>
-    s.toLowerCase()
-     .replace(/[^a-z0-9 ]/g, " ")
-     .replace(/\s+/g, " ")
-     .trim();
-
-  const a = normalize(matches[1]);
-  const b = normalize(matches[2]);
-
-  return Boolean(a && b && a !== b);
+  return output;
 }
 
-
-function getTokens(market) {
-  let tokens = array(market.clobTokenIds || market.clob_token_ids || market.tokenIds);
-
-  if (!tokens.length && Array.isArray(market.tokens)) {
-    tokens = market.tokens.map(t => t.token_id || t.tokenId || t.id);
-  }
-
-  return tokens.map(String).filter(Boolean);
+function validPrice(value) {
+  const p = Number(value);
+  return Number.isFinite(p) && p > 0 && p < 1 ? p : null;
 }
 
-function getOutcomes(market) {
-  const outcomes = array(market.outcomes);
-  if (outcomes.length) return outcomes.map(clean);
-
-  if (Array.isArray(market.tokens)) {
-    return market.tokens.map(t => clean(t.outcome || t.name));
-  }
-
-  return [];
-}
-function validMarket(market) {
-  return market &&
-    market.active !== false &&
-    market.closed !== true &&
-    getTokens(market).length >= 2;
+function decimal(value) {
+  const p = validPrice(value);
+  return p === null ? null : Number((1 / p).toFixed(2));
 }
 
-function decimalPrice(price) {
-  const p = Number(price);
-  if (!Number.isFinite(p) || p <= 0.02 || p >= 0.98) {
-    return null;
-  }
-  return (1 / p).toFixed(2);
+function publish() {
+  send("matches", { matches });
 }
 
-function parseDate(event) {
-  const raw = event.startTime || event.startDate || event.gameStartTime || event.eventDate;
-  if (!raw) return null;
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+function updateBook(token, bids, asks) {
+  const bid = bids.length ? Math.max(...bids.map(x => Number(x.price)).filter(Number.isFinite)) : null;
+  const ask = asks.length ? Math.min(...asks.map(x => Number(x.price)).filter(Number.isFinite)) : null;
+
+  books.set(token, { bid: validPrice(bid), ask: validPrice(ask), updatedAt: Date.now() });
+
+  const linked = tokenMap.get(token);
+  if (!linked) return;
+
+  const match = matches.find(m => m.id === linked.marketId);
+  if (!match) return;
+
+  match.quotes[linked.name] = {
+    buy: decimal(ask),
+    sell: decimal(bid),
+    bid: validPrice(bid),
+    ask: validPrice(ask),
+    updatedAt: Date.now()
+  };
+
+  send("quote", {
+    marketId: match.id,
+    tokenId: token,
+    outcome: linked.name,
+    quote: match.quotes[linked.name]
+  });
 }
 
-function buildMatches(events) {
-  const result = [];
+function handleSocketMessage(raw) {
+  let data;
+  try { data = JSON.parse(raw); } catch { return; }
+
+  const events = Array.isArray(data) ? data : [data];
 
   for (const event of events) {
-    const sport = sportOf(event);
-    const title = clean(event.title || event.question || '');
-
-    if (!sport || !ALLOWED.has(sport) || !isMatchTitle(title)) continue;
-
-    const markets = (Array.isArray(event.markets) ? event.markets : [])
-      .filter(validMarket)
-      .map(market => ({
-        question: clean(market.question || market.groupItemTitle || title),
-        tokens: getTokens(market),
-        outcomes: getOutcomes(market),
-        quotes: []
-      }));
-
-    if (!markets.length) continue;
-
-    const first = markets[0];
-    const id = String(event.id || event.slug || title);
-
-    result.push({
-      id,
-      title,
-      sport,
-      date: parseDate(event),
-      live: Boolean(event.live || event.isLive),
-      url: event.slug ? `https://polymarket.com/event/${event.slug}` : '',
-      question: first.question,
-      token: first.tokens[0],
-      outcomes: first.outcomes,
-      markets,
-      quote: {}
-    });
-  }
-
-  return result;
-}
-
-function publishMatches() {
-  const output = matches.map(match => {
-    const marketOutput = match.markets.map(market => ({
-      question: market.question,
-      tokens: market.tokens,
-      outcomes: market.outcomes,
-      quotes: market.tokens.map(token => quotes.get(token) || {})
-    }));
-
-    const firstToken = match.token;
-    return {
-      ...match,
-      quote: quotes.get(firstToken) || {},
-      markets: marketOutput
-    };
-  });
-
-  send('matches', { matches: output });
-}
-
-async function refresh() {
-  if (loading) return;
-  loading = true;
-  const started = performance.now();
-
-  send('status', { text: 'Fetching public Polymarket events…' });
-
-  try {
-    const events = [];
-
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const url = `${GAMMA}?active=true&closed=false&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`;
-
-      const response = await fetch(url, {
-        headers: { accept: 'application/json' }
-      });
-
-      if (!response.ok) throw new Error(`Gamma HTTP ${response.status}`);
-
-      const batch = await response.json();
-      if (!Array.isArray(batch) || batch.length === 0) break;
-
-      events.push(...batch);
-
-      if (batch.length < PAGE_SIZE) break;
+    if (event.event_type === "book" && event.asset_id) {
+      updateBook(
+        String(event.asset_id),
+        Array.isArray(event.bids) ? event.bids : [],
+        Array.isArray(event.asks) ? event.asks : []
+      );
     }
 
-    lastFetchMs = Math.round(performance.now() - started);
-    matches = buildMatches(events);
+    if (event.event_type === "price_change" && Array.isArray(event.price_changes)) {
+      for (const change of event.price_changes) {
+        const token = String(change.asset_id || "");
+        if (!token) continue;
 
-    // Keep existing quotes for tokens still in the active match set.
-    tokenOwners.clear();
+        const old = books.get(token) || {};
+        const bid = validPrice(change.best_bid) ?? old.bid ?? null;
+        const ask = validPrice(change.best_ask) ?? old.ask ?? null;
+        books.set(token, { bid, ask, updatedAt: Date.now() });
 
-    for (const match of matches) {
-      for (const market of match.markets) {
-        for (const token of market.tokens) {
-          if (!tokenOwners.has(token)) tokenOwners.set(token, match.id);
-        }
+        const linked = tokenMap.get(token);
+        if (!linked) continue;
+        const match = matches.find(m => m.id === linked.marketId);
+        if (!match) continue;
+
+        match.quotes[linked.name] = {
+          buy: decimal(ask),
+          sell: decimal(bid),
+          bid,
+          ask,
+          updatedAt: Date.now()
+        };
+
+        send("quote", {
+          marketId: match.id,
+          tokenId: token,
+          outcome: linked.name,
+          quote: match.quotes[linked.name]
+        });
       }
     }
-
-    const needed = new Set(tokenOwners.keys());
-    for (const token of [...quotes.keys()]) {
-      if (!needed.has(token)) quotes.delete(token);
-    }
-
-    send('stats', {
-      events: events.length,
-      matches: matches.length,
-      packets: packetCount,
-      latency: lastFetchMs
-    });
-
-    publishMatches();
-    connectSocket();
-    syncSubscriptions();
-  } catch (error) {
-    send('error', { message: error?.message || 'Unknown Gamma error' });
-  } finally {
-    loading = false;
   }
 }
 
 function connectSocket() {
-  if (socket && (
-    socket.readyState === WebSocket.OPEN ||
-    socket.readyState === WebSocket.CONNECTING
-  )) return;
-
+  if (stopped || tokenMap.size === 0) return;
   try {
+    if (socket) socket.close();
     socket = new WebSocket(CLOB_WS);
 
-    socket.addEventListener('open', () => {
-      reconnectDelay = 1500;
-      send('conn', { connected: true });
-
-      // Subscribe to active tokens in manageable batches.
-      syncSubscriptions();
-
-      clearInterval(heartbeat);
-      heartbeat = setInterval(() => {
-        if (socket?.readyState === WebSocket.OPEN) socket.send('PING');
-      }, 10000);
-    });
-
-    socket.addEventListener('message', event => {
-      if (event.data === 'PONG' || event.data === 'pong') return;
-
-      packetCount++;
-
-      let message;
-      try {
-        message = JSON.parse(event.data);
-      } catch {
-        return;
+    socket.onopen = () => {
+      send("status", { status: "LIVE", message: "CLOB connected" });
+      const tokens = [...tokenMap.keys()];
+      for (let i = 0; i < tokens.length; i += 500) {
+        socket.send(JSON.stringify({
+          type: "market",
+          assets_ids: tokens.slice(i, i + 500),
+          custom_feature_enabled: true
+        }));
       }
+    };
 
-      const list = Array.isArray(message) ? message : [message];
-      let changed = false;
+    socket.onmessage = e => handleSocketMessage(e.data);
 
-      for (const item of list) {
-        if (!item || typeof item !== 'object') continue;
+    socket.onerror = () =>
+      send("status", { status: "DISCONNECTED", message: "WebSocket error" });
 
-        if (item.event_type === 'book' || (item.bids && item.asks)) {
-          const token = String(item.asset_id || item.assetId || '');
-          if (!tokenOwners.has(token)) continue;
+    socket.onclose = () => {
+      send("status", { status: "WAITING", message: "Reconnecting…" });
+      if (!stopped) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(connectSocket, 2000);
+      }
+    };
+  } catch (error) {
+    send("status", { status: "DISCONNECTED", message: String(error) });
+  }
+}
 
-          const bids = Array.isArray(item.bids) ? item.bids : [];
-          const asks = Array.isArray(item.asks) ? item.asks : [];
+async function loadMatches() {
+  stopped = false;
+  send("status", { status: "WAITING", message: "Loading Polymarket events…" });
 
-          const bid = bids.map(x => Number(x.price))
-            .filter(x => x > 0 && x < 1)
-            .sort((a, b) => b - a)[0] ?? null;
+  try {
+    const found = [];
+    const seen = new Set();
 
-          const ask = asks.map(x => Number(x.price))
-            .filter(x => x > 0 && x < 1)
-            .sort((a, b) => a - b)[0] ?? null;
+    for (let offset = 0; offset < 1000; offset += 100) {
+      const url = new URL(`${GAMMA}/events`);
+      url.searchParams.set("active", "true");
+      url.searchParams.set("closed", "false");
+      url.searchParams.set("limit", "100");
+      url.searchParams.set("offset", String(offset));
+      url.searchParams.set("order", "startDate");
+      url.searchParams.set("ascending", "true");
 
-          quotes.set(token, { bid, ask, at: Date.now() });
-          changed = true;
-        }
+      const response = await fetch(url.toString());
+      if (!response.ok) throw new Error(`Gamma HTTP ${response.status}`);
 
-        if (item.event_type === 'best_bid_ask') {
-          const token = String(item.asset_id || '');
-          if (!tokenOwners.has(token)) continue;
+      const page = await response.json();
+      if (!Array.isArray(page) || page.length === 0) break;
 
-          const bid = Number(item.best_bid);
-          const ask = Number(item.best_ask);
-
-          quotes.set(token, {
-            bid: Number.isFinite(bid) && bid > 0 && bid < 1 ? bid : null,
-            ask: Number.isFinite(ask) && ask > 0 && ask < 1 ? ask : null,
-            at: Date.now()
-          });
-
-          changed = true;
-        }
-
-        if (item.event_type === 'price_change' && Array.isArray(item.price_changes)) {
-          for (const change of item.price_changes) {
-            const token = String(change.asset_id || '');
-            if (!tokenOwners.has(token)) continue;
-
-            const previous = quotes.get(token) || {};
-            const bid = Number(change.best_bid);
-            const ask = Number(change.best_ask);
-
-            quotes.set(token, {
-              bid: Number.isFinite(bid) && bid > 0 && bid < 1
-                ? bid : (previous.bid ?? null),
-              ask: Number.isFinite(ask) && ask > 0 && ask < 1
-                ? ask : (previous.ask ?? null),
-              at: Date.now()
-            });
-
-            changed = true;
-          }
+      for (const event of page) {
+        const rows = parseEvent(event);
+        for (const row of rows) {
+          if (seen.has(row.id)) continue;
+          seen.add(row.id);
+          found.push(row);
         }
       }
 
-      if (changed) {
-        publishMatches();
-        send('stats', {
-          events: undefined,
-          matches: matches.length,
-          packets: packetCount,
-          latency: lastFetchMs
+      send("stats", { eventsLoaded: offset + page.length, matchesFound: found.length });
+      if (page.length < 100) break;
+    }
+
+    matches = found;
+    tokenMap.clear();
+    books.clear();
+
+    for (const match of matches) {
+      for (const selection of match.selections) {
+        tokenMap.set(selection.tokenId, {
+          marketId: match.id,
+          name: selection.name
         });
       }
+    }
+
+    publish();
+    send("stats", {
+      eventsLoaded: matches.length,
+      matchesFound: matches.length,
+      tokensSubscribed: tokenMap.size
     });
 
-    socket.addEventListener('close', () => {
-      clearInterval(heartbeat);
-      send('conn', { connected: false });
-
-      clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(() => {
-        connectSocket();
-      }, reconnectDelay);
-
-      reconnectDelay = Math.min(reconnectDelay * 2, 15000);
-    });
-
-    socket.addEventListener('error', () => {
-      try { socket.close(); } catch {}
-    });
+    if (tokenMap.size) connectSocket();
+    else send("status", { status: "WAITING", message: "No eligible outcome tokens found" });
   } catch (error) {
-    send('conn', { connected: false });
-    send('error', { message: error?.message || 'WebSocket connection failed' });
+    send("status", { status: "DISCONNECTED", message: String(error?.message || error) });
+    send("error", { message: String(error?.message || error) });
   }
 }
 
-function syncSubscriptions() {
-  if (!socket || socket.readyState !== WebSocket.OPEN) return;
-
-  const tokens = [...tokenOwners.keys()];
-  const newTokens = tokens.filter(token => !subscribed.has(token));
-
-  for (let i = 0; i < newTokens.length; i += 100) {
-    const batch = newTokens.slice(i, i + 100);
-
-    socket.send(JSON.stringify({
-      type: 'market',
-      assets_ids: batch,
-      custom_feature_enabled: true
-    }));
-
-    batch.forEach(token => subscribed.add(token));
+self.onmessage = event => {
+  const data = event.data || {};
+  if (data.type === "start" || data.type === "refresh") {
+    loadMatches();
+  } else if (data.type === "stop") {
+    stopped = true;
+    clearTimeout(reconnectTimer);
+    if (socket) socket.close();
   }
+};
 
-  const wanted = new Set(tokens);
-  const removed = [...subscribed].filter(token => !wanted.has(token));
+loadMatches();
 
-  for (let i = 0; i < removed.length; i += 100) {
-    const batch = removed.slice(i, i + 100);
-
-    socket.send(JSON.stringify({
-      assets_ids: batch,
-      operation: 'unsubscribe',
-      type: 'market'
-    }));
-
-    batch.forEach(token => subscribed.delete(token));
-  }
-}
-
-self.addEventListener('message', event => {
-  if (event.data?.cmd === 'refresh') refresh();
-});
-
-// Initial data load.
-refresh();
