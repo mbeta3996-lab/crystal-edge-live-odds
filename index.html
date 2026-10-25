@@ -2,20 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Odds Dashboard – Cricket, Soccer, Tennis</title>
+<title>Odds Dashboard – Cricket / Soccer / Tennis</title>
 <style>
   body {font-family:Arial,Helvetica,sans-serif; margin:0; padding:0; background:#fafafa;}
-  header {background:#333; color:#fff; padding:0.8rem 1rem; text-align:center;}
+  header {background:#333; color:#fff; padding:0.8rem 1rem; text-align:center; position:relative;}
   #search {margin:0.5rem 0; padding:0.4rem; width:80%; max-width:400px;}
   #refresh {margin-left:0.5rem; padding:0.4rem 0.8rem;}
   #matches {list-style:none; padding:0; margin:0;}
   #matches li {border-bottom:1px solid #ddd; padding:0.6rem 1rem;}
   #matches li span {font-weight:bold;}
+
+  /* tiny connection badge – green dot only when WS is open */
+  #connBadge {
+    position:absolute; top:0.5rem; right:0.8rem;
+    display:inline-flex; align-items:center; gap:0.3rem;
+    font-size:0.85rem; color:#fff;
+  }
+  #connBadge .dot {width:8px; height:8px; border-radius:50%; background:#555;}
+  #connBadge.connected .dot {background:#0a0;}   /* green when WS is open */
 </style>
 </head>
 <body>
 <header>
   <h1>Live Odds – Cricket / Soccer / Tennis</h1>
+  <div id="connBadge" class="connected">
+    <div class="dot"></div>
+    <span id="statusText">Connecting…</span>
+    <span id="latency">Latency: –</span> |
+    <span id="packetCount">Packets: 0</span>
+  </div>
   <input id="search" type="text" placeholder="Search team / match…">
   <button id="refresh">Refresh</button>
 </header>
@@ -23,34 +38,62 @@
 <ul id="matches"></ul>
 
 <script>
-/* Register the worker – it will start the socket and forward filtered odds */
-if (window.Worker) {
-  const worker = new Worker('worker.js');
-  worker.onmessage = e => {
-    // e.data = { sport, teams, odds } – already filtered
-    renderMatches(e.data);
-  };
-  // Auto‑refresh every 30 s (you can change the interval)
-  setInterval(() => worker.postMessage({cmd:'fetch'}), 30_000);
-  // Manual refresh button
-  document.getElementById('refresh').onclick = () => worker.postMessage({cmd:'fetch'});
-  // Search bar – filters the displayed list client‑side
-  const list = document.getElementById('matches');
-  const searchBox = document.getElementById('search');
-  searchBox.addEventListener('input', () => {
-    const term = searchBox.value.trim().toLowerCase();
-    const items = list.querySelectorAll('li');
-    items.forEach(li => {
-      const txt = li.textContent.toLowerCase();
-      li.style.display = txt.includes(term) ? '' : 'none';
-    });
-  });
-}
+/* --------------------------------------------------------------
+   Main thread – UI + communication with the worker
+   -------------------------------------------------------------- */
+const worker = new Worker('worker.js');
 
-/* Render the odds received from the worker */
+const badge   = document.getElementById('connBadge');
+const dot     = badge.querySelector('.dot');
+const status  = document.getElementById('statusText');
+const latency = document.getElementById('latency');
+const packets = document.getElementById('packetCount');
+
+let lastLatency = null;   // ms – updated on every fetch‑response
+let packetCount = 0;      // total packets received (incl. filtered)
+
+worker.onmessage = e => {
+  const msg = e.data;
+
+  // ----------------------------------------------------------------
+  // 1️⃣ Odds payload (type = 'odds')
+  // ----------------------------------------------------------------
+  if (msg.type === 'odds') {
+    renderMatches(msg);
+  }
+
+  // ----------------------------------------------------------------
+  // 2️⃣ Stats payload (type = 'stats')
+  // ----------------------------------------------------------------
+  if (msg.type === 'stats') {
+    if (typeof msg.latency === 'number') {
+      lastLatency = msg.latency;
+      latency.textContent = `Latency: ${lastLatency} ms`;
+    }
+    if (typeof msg.packets === 'number') {
+      packetCount = msg.packets;
+      packets.textContent = `Packets: ${packetCount}`;
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // 3️⃣ Connection status (type = 'conn')
+  // ----------------------------------------------------------------
+  if (msg.type === 'conn') {
+    if (msg.connected) {
+      badge.classList.add('connected');
+      status.textContent = 'Connected';
+    } else {
+      badge.classList.remove('connected');
+      status.textContent = 'Disconnected';
+    }
+  }
+};
+
+/* Render the odds list */
 function renderMatches(data) {
   const ul = document.getElementById('matches');
-  ul.innerHTML = '';                     // clear previous rows
+  ul.innerHTML = '';
   if (!data || !data.matches) return;
   data.matches.forEach(m => {
     const li = document.createElement('li');
@@ -62,6 +105,20 @@ function renderMatches(data) {
     ul.appendChild(li);
   });
 }
+
+/* UI helpers */
+document.getElementById('refresh').onclick = () => worker.postMessage({cmd:'fetch'});
+
+document.getElementById('search').addEventListener('input', () => {
+  const term = this.value.trim().toLowerCase();
+  document.querySelectorAll('#matches li').forEach(li => {
+    const txt = li.textContent.toLowerCase();
+    li.style.display = txt.includes(term) ? '' : 'none';
+  });
+});
+
+/* Kick‑off – ask the worker for the first batch */
+worker.postMessage({cmd:'fetch'});
 </script>
 </body>
 </html>
