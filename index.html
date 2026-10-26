@@ -1,387 +1,66 @@
-
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#ffffff">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#fff">
 <title>CRYSTAL EDGE — Polymarket Live Sports</title>
 <style>
-:root{color-scheme:light;--bg:#fff;--card:#fff;--text:#111;--muted:#666;--line:#ddd}
-*{box-sizing:border-box}
-body{margin:0;background:#fff;color:#111;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-button,input,select{font:inherit}button{cursor:pointer;color:#111}
-header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:12px 14px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:850px;margin:auto}
-.brand{font-size:17px;font-weight:900;letter-spacing:.7px}.sub{font-size:10px;color:#666;margin-top:3px;letter-spacing:1px}
-.refresh{border:1px solid #ddd;background:#fff;border-radius:10px;width:42px;height:42px;font-size:22px}
-.wrap{max-width:850px;margin:auto;padding:12px}
-.sports,.times{display:flex;gap:7px;overflow-x:auto;padding:3px 0 9px;scrollbar-width:none}
-.sports button,.times button{flex:0 0 auto;border:1px solid #ddd;background:#fff;border-radius:10px;padding:9px 12px}
-.sports button{font-size:19px;min-width:44px;padding:7px}
-.sports button.active,.times button.active{background:#111;color:#fff;border-color:#111}
-.searchrow{display:flex;gap:8px;margin:2px 0 10px}
-.searchrow input,.searchrow select{min-width:0;border:1px solid #ddd;border-radius:10px;background:#fff;padding:11px;color:#111}
-.searchrow input{flex:1}.searchrow select{max-width:125px}
-.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:5px 0 10px}
-.stat{background:#fff;border:1px solid #ddd;border-radius:9px;padding:8px;min-width:0}
-.stat small{display:block;color:#666;font-size:9px;margin-bottom:4px}.stat strong{font-size:12px;overflow-wrap:anywhere}
-.statusline{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:7px 1px 12px;color:#666;font-size:10px}
-.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#999;margin-right:5px}.dot.good{background:#111}.dot.bad{background:#666}
-#cards{display:flex;flex-direction:column;gap:9px}
-.card{background:#fff;border:1px solid #ddd;border-radius:12px;padding:12px}
-.cardtop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.sporttag{font-size:10px;color:#666;font-weight:750;letter-spacing:.6px}
-.matchtitle{font-weight:800;font-size:14px;line-height:1.4;margin:5px 0;overflow-wrap:anywhere}
-.time{font-size:10px;color:#666;text-align:right;white-space:nowrap;line-height:1.6}
-.live{font-weight:900;color:#111}
-.outcomes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}
-.outcome{border:1px solid #ddd;border-radius:9px;padding:9px;min-width:0;background:#fff}
-.outname{font-size:12px;font-weight:850;margin-bottom:7px;overflow-wrap:anywhere}
-.quoteRow{display:flex;justify-content:space-between;gap:5px;border-top:1px solid #eee;padding-top:7px}
-.quoteSide{min-width:0}.quoteSide.right{text-align:right}
-.quoteLabel{font-size:10px;font-weight:750}.cents{font-size:16px;font-weight:900;margin-top:3px}
-.decimal{font-size:11px;color:#666;margin-top:2px}.volume{font-size:10px;color:#666;margin-top:4px}
-.cardfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;font-size:10px;color:#666}
-a{color:#111;text-decoration:underline;font-weight:750}
-.textbtn{border:1px solid #ccc;background:#fff;border-radius:8px;padding:7px 10px}
-.empty{padding:26px 12px;text-align:center;color:#666;background:#fff;border:1px solid #ddd;border-radius:12px;line-height:1.7;overflow-wrap:anywhere}
-.error{color:#111}footer{padding:18px 4px 30px;color:#666;font-size:10px;text-align:center;line-height:1.7}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;display:none;align-items:flex-end;justify-content:center}
-.modal.open{display:flex}
-.sheet{background:#fff;color:#111;width:100%;max-width:650px;max-height:82dvh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
-.sheethead{display:flex;justify-content:space-between;align-items:center;gap:8px;position:sticky;top:-16px;background:#fff;padding:4px 0 12px}
-.sheet h3{margin:0;font-size:16px}.marketitem{border:1px solid #ddd;border-radius:9px;padding:10px;margin:8px 0;overflow-wrap:anywhere}
-.marketitem strong{display:block;margin-bottom:6px}.marketitem a{display:inline-block;margin-top:7px}
-@media(min-width:650px){.wrap{padding:18px}.stats{grid-template-columns:repeat(6,minmax(0,1fr))}.card{padding:15px}}
-</style>
-</head>
-<body>
-<header><div class="top"><div>
-<div class="brand">◇ CRYSTAL EDGE</div>
-<div class="sub">POLYMARKET · LIVE SPORTS</div>
-</div><button class="refresh" id="refresh" aria-label="Refresh" title="Refresh">↻</button></div></header>
-
-<main class="wrap">
-<div class="sports" id="sports">
-<button class="active" data-sport="all" aria-label="All sports">◈</button>
-<button data-sport="cricket" aria-label="Cricket">🏏</button>
-<button data-sport="tennis" aria-label="Tennis">🎾</button>
-<button data-sport="soccer" aria-label="Football">⚽</button>
-</div>
-<div class="times" id="times">
-<button class="active" data-time="all">All matches</button>
-<button data-time="live">Live now</button>
-<button data-time="today">Today</button>
-<button data-time="tomorrow">Tomorrow</button>
-<button data-time="upcoming">Upcoming</button>
-</div>
-<div class="searchrow">
-<input id="search" type="search" placeholder="Search team, player or match…" autocomplete="off">
-<select id="sort" aria-label="Sort matches"><option value="time">By time</option><option value="name">By name</option></select>
-</div>
-<div class="stats">
-<div class="stat"><small>MATCHES SHOWN</small><strong id="matchCount">—</strong></div>
-<div class="stat"><small>WORKER / GAMMA</small><strong id="gammaStatus">LOADING</strong></div>
-<div class="stat"><small>CLOB WEBSOCKET</small><strong id="wsState">CONNECTING</strong></div>
-<div class="stat"><small>SUBSCRIBED TOKENS</small><strong id="subCount">0</strong></div>
-<div class="stat"><small>PACKETS RECEIVED</small><strong id="msgCount">0</strong></div>
-<div class="stat"><small>PACKETS / SEC</small><strong id="packetRate">0</strong></div>
-</div>
-<div class="statusline">
-<span><i class="dot" id="statusDot"></i><span id="statusText">Loading matches from Worker…</span></span>
-<span id="latency">Render — ms · Last packet —</span>
-</div>
-<section id="cards"><div class="empty">Loading Polymarket matches…</div></section>
-<footer>Discovery: your Cloudflare Worker / Polymarket Gamma.<br>
-Live quotes: public Polymarket CLOB WebSocket.<br>
-BUY = best ask · SELL = best bid · Decimal odds = 1 ÷ price.<br>
-Unavailable quotes remain —. No fabricated prices.</footer>
+:root{color-scheme:light;--ink:#111;--muted:#686868;--line:#dedede;--soft:#f7f7f7}*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input{font:inherit}button{background:#fff;border:1px solid #ccc;color:#111;border-radius:9px;padding:8px 10px;white-space:nowrap;cursor:pointer}button:disabled{opacity:.5}button.active{background:#111;color:#fff;border-color:#111}.top{position:sticky;top:0;z-index:5;background:#fffffff2;backdrop-filter:blur(10px);padding:10px 12px;border-bottom:1px solid var(--line);padding-top:max(10px,env(safe-area-inset-top))}.head{display:flex;align-items:center;justify-content:space-between;gap:8px}.brand{font-size:16px;font-weight:850;letter-spacing:.4px}.sub{font-size:9px;letter-spacing:1px;color:var(--muted);margin-top:2px}.refresh{font-size:18px;padding:5px 10px}main{max-width:900px;margin:auto;padding:9px 10px 22px}.filters{display:flex;gap:5px;overflow-x:auto;padding:8px 0;scrollbar-width:none}.filters::-webkit-scrollbar{display:none}.filters button{font-size:11px;padding:7px 10px;flex-shrink:0}.sports button{font-size:18px;min-width:42px;padding:5px 10px}.search{width:100%;border:1px solid #ccc;border-radius:9px;padding:10px 11px;margin:3px 0 8px;background:#fff;color:#111;outline:none}.status{font-size:10px;color:var(--muted);line-height:1.4;padding:3px 1px 7px}.matches{display:grid;grid-template-columns:1fr;gap:7px}.card{border:1px solid var(--line);border-radius:11px;padding:9px;min-width:0}.meta{display:flex;justify-content:space-between;gap:6px;font-size:9px;color:var(--muted)}.matchtitle{font-weight:800;font-size:13px;line-height:1.25;margin:6px 0 8px;overflow-wrap:anywhere}.teams{display:grid;grid-template-columns:1fr 1fr;gap:6px}.team{border:1px solid #e0e0e0;background:#fafafa;border-radius:8px;padding:7px;min-width:0}.teamname{font-size:10px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}.prices{display:grid;grid-template-columns:1fr 1fr;gap:4px}.pricecell{background:#fff;border:1px solid #e5e5e5;border-radius:6px;text-align:center;padding:5px 2px;min-width:0}.cents{font-size:15px;font-weight:850;font-variant-numeric:tabular-nums;line-height:1.15}.decimal{font-size:10px;color:#666;font-variant-numeric:tabular-nums;margin-top:3px}.cardfoot{display:flex;justify-content:space-between;align-items:center;gap:5px;margin-top:7px;font-size:9px;color:var(--muted)}.cardfoot button{font-size:10px;padding:6px 8px}.empty{border:1px dashed #bbb;border-radius:10px;padding:18px;text-align:center;color:var(--muted);font-size:12px;line-height:1.5}.telemetry{margin-top:12px;border:1px solid var(--line);border-radius:11px;padding:9px}.sectitle{font-size:10px;font-weight:850;letter-spacing:.7px;margin:0 0 7px}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.metric{border:1px solid #e5e5e5;border-radius:8px;padding:7px;min-width:0}.metric strong{display:block;font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.metric span{font-size:9px;color:var(--muted);line-height:1.25;display:block;margin-top:2px}.tiny{font-size:9px;color:var(--muted);line-height:1.4;margin-top:7px}dialog{width:calc(100% - 16px);max-width:600px;max-height:88dvh;overflow:auto;border:1px solid #bbb;border-radius:12px;background:#fff;color:#111;padding:10px}dialog::backdrop{background:#0006}.modalhead{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:-10px;background:#fff;padding:4px 0 8px;border-bottom:1px solid var(--line);z-index:2}.modalhead strong{font-size:13px}.modalstatus{font-size:10px;color:var(--muted);line-height:1.4;padding:8px 0}.compare{display:grid;grid-template-columns:1fr 1fr;gap:6px}.comparebox{border:1px solid var(--line);border-radius:8px;padding:7px;min-width:0}.comparetitle{font-size:10px;font-weight:800;margin-bottom:5px}.snapshotline{font-size:10px;line-height:1.5;overflow-wrap:anywhere}.marketrow{border-top:1px solid var(--line);padding:8px 0}.marketrow h3{font-size:11px;margin:0 0 6px}.marketout{display:grid;grid-template-columns:1fr 1fr;gap:5px}.outcome{border:1px solid #e5e5e5;border-radius:7px;padding:6px;min-width:0}.outname{font-size:10px;font-weight:750;overflow-wrap:anywhere}.outvals{font-size:10px;color:#444;margin-top:4px;line-height:1.45}.link{color:#111;text-decoration:underline}footer{font-size:9px;color:var(--muted);line-height:1.5;padding:12px 2px}@media(min-width:620px){.matches{grid-template-columns:repeat(2,minmax(0,1fr))}.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.brand{font-size:17px}}
+</style></head><body>
+<header class="top"><div class="head"><div><div class="brand">◇ CRYSTAL EDGE</div><div class="sub">POLYMARKET · LIVE SPORTS</div></div><button id="refresh" class="refresh" aria-label="Refresh">↻</button></div></header>
+<main>
+<div class="filters sports" id="sports"><button class="active" data-sport="all" aria-label="All sports" title="All sports">◎</button><button data-sport="cricket" aria-label="Cricket" title="Cricket">🏏</button><button data-sport="tennis" aria-label="Tennis" title="Tennis">🎾</button><button data-sport="football" aria-label="Football" title="Football">⚽</button></div>
+<div class="filters" id="times"><button data-time="live">LIVE</button><button class="active" data-time="today">TODAY</button><button data-time="tomorrow">TOMORROW</button><button data-time="all">ALL</button></div>
+<input id="search" class="search" type="search" placeholder="Search team / player / match…" autocomplete="off">
+<div id="status" class="status">Connecting to CRYSTAL EDGE Worker…</div>
+<section id="matches" class="matches"><div class="empty">Loading actual Polymarket matches…</div></section>
+<section class="telemetry"><h2 class="sectitle">LATENCY & SOCKET TELEMETRY</h2><div class="metrics">
+<div class="metric"><strong id="wsState">Connecting</strong><span>WebSocket status</span></div>
+<div class="metric"><strong id="packets">0</strong><span>Total messages received</span></div>
+<div class="metric"><strong id="pps">0/s</strong><span>Messages / second</span></div>
+<div class="metric"><strong id="ppms">0</strong><span>Average messages / ms (rolling 1s)</span></div>
+<div class="metric"><strong id="packetAge">—</strong><span>Last message age</span></div>
+<div class="metric"><strong id="renderMs">—</strong><span>Message processing → UI</span></div>
+<div class="metric"><strong id="restMs">—</strong><span>Last public REST request</span></div>
+<div class="metric"><strong id="reconnects">0</strong><span>Socket reconnects</span></div>
+<div class="metric"><strong id="quoteAge">—</strong><span>Latest quote age</span></div>
+<div class="metric"><strong id="socketCount">0</strong><span>Subscribed token IDs</span></div>
+</div><div class="tiny">Packets count WebSocket messages, not necessarily price changes. REST time measures a snapshot request; the Details comparison records observed arrival order when a matching price is seen.</div></section>
+<footer>Source: Polymarket Gamma via your Cloudflare Worker + public Polymarket CLOB WebSocket/REST. Prices are shown only when real bid/ask quotes are received. Left price = bid, right price = ask; decimal conversion is shown underneath.</footer>
 </main>
-
-<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Available markets">
-<div class="sheet"><div class="sheethead"><h3 id="modalTitle">Available markets</h3><button class="textbtn" id="closeModal">Close ✕</button></div><div id="marketContent">Loading…</div></div>
-</div>
-
+<dialog id="details"><div class="modalhead"><strong id="detailTitle">Match Details</strong><button id="closeDetails">Close</button></div><div id="detailStatus" class="modalstatus">Loading live comparison…</div><div class="compare"><div class="comparebox"><div class="comparetitle">POLYMARKET PUSH</div><div id="pushInfo" class="snapshotline">Waiting for socket quote…</div></div><div class="comparebox"><div class="comparetitle">PUBLIC REST FEED</div><div id="restInfo" class="snapshotline">Snapshot not requested yet.</div></div></div><div id="detailBody"></div></dialog>
 <script>
-(()=>{
 'use strict';
-
 const WORKER='https://crystal-live-odds.mbeta3996.workers.dev';
 const WS_URL='wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const $=id=>document.getElementById(id);
-
-const state={
- sport:'all',time:'all',search:'',sort:'time',
- matches:[],quotes:new Map(),subscribed:new Set(),
- socket:null,loading:false,generation:0,
- msgCount:0,lastMessageAt:0,packetTimes:[],
- wsState:'CONNECTING',marketCache:new Map()
-};
-
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({
- '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-})[c]);
-
-function validPrice(v){
- if(v===null||v===undefined||v==='')return null;
- const n=Number(v);
- return Number.isFinite(n)&&n>0&&n<1?n:null;
-}
-function best(levels,side){
- if(!Array.isArray(levels))return null;
- const p=levels.map(x=>validPrice(x?.price)).filter(x=>x!==null);
- if(!p.length)return null;
- return side==='bid'?Math.max(...p):Math.min(...p);
-}
-function sportOf(m){
- const s=(String(m.sport||'')+' '+String(m.title||'')+' '+String(m.slug||'')).toLowerCase();
- if(s.includes('cricket')||/\b(t20|odi|ipl|ashes)\b/.test(s))return 'cricket';
- if(s.includes('tennis'))return 'tennis';
- if(/\b(soccer|football)\b/.test(s))return 'soccer';
- return '';
-}
-function norm(m){
- const ids=Array.isArray(m.clobTokenIds)?m.clobTokenIds:
-  Array.isArray(m.clob_token_ids)?m.clob_token_ids:
-  Array.isArray(m.tokenIds)?m.tokenIds:[];
- const outcomes=Array.isArray(m.outcomes)?m.outcomes:[];
- let tokens=Array.isArray(m.tokens)?m.tokens.map((t,i)=>({
-  id:String(typeof t==='object'?(t.id??t.tokenId??t.token_id??''):t),
-  name:String(typeof t==='object'?(t.name??t.outcome??outcomes[i]??'Outcome '+(i+1)):outcomes[i]??'Outcome '+(i+1))
- })):ids.map((id,i)=>({id:String(id),name:String(outcomes[i]||'Outcome '+(i+1))}));
- return {...m,id:String(m.id??m.eventId??m.title),
-  title:String(m.title??m.name??'Unknown match'),
-  sport:sportOf(m),tokens:tokens.filter(t=>t.id&&t.id!=='undefined')};
-}
-function quote(id){
- if(!state.quotes.has(id))state.quotes.set(id,{bid:null,ask:null,volume:null,updatedAt:0});
- return state.quotes.get(id);
-}
-function updateQuote(id,bid,ask,volume){
- if(!id)return false;
- const q=quote(String(id));let changed=false;
- const b=validPrice(bid),a=validPrice(ask);
- if(b!==null&&b!==q.bid){q.bid=b;changed=true}
- if(a!==null&&a!==q.ask){q.ask=a;changed=true}
- if(volume!==undefined&&Number.isFinite(Number(volume)))q.volume=Number(volume);
- if(changed)q.updatedAt=Date.now();
- return changed;
-}
-function handleMessage(m){
- if(!m||typeof m!=='object')return false;
- const type=String(m.event_type||m.type||'').toLowerCase();
- let changed=false;
-
- if(type==='book'){
-  const id=String(m.asset_id||'');
-  if(id)changed=updateQuote(id,best(m.bids,'bid'),best(m.asks,'ask'))||changed;
- }else if(type==='best_bid_ask'){
-  changed=updateQuote(m.asset_id,m.best_bid,m.best_ask)||changed;
- }else if(type==='price_change'){
-  for(const p of (m.price_changes||[])){
-   changed=updateQuote(p.asset_id,p.best_bid,p.best_ask)||changed;
-  }
- }else if(m.asset_id&&(m.best_bid!==undefined||m.best_ask!==undefined)){
-  changed=updateQuote(m.asset_id,m.best_bid,m.best_ask)||changed;
- }
- return changed;
-}
-function subscribe(){
- const ws=state.socket;
- if(!ws||ws.readyState!==WebSocket.OPEN)return;
- const ids=[...new Set(state.matches.flatMap(m=>m.tokens.map(t=>t.id)))];
- const fresh=ids.filter(id=>!state.subscribed.has(id));
- for(let i=0;i<fresh.length;i+=100){
-  const batch=fresh.slice(i,i+100);
-  try{
-   ws.send(JSON.stringify({
-    type:'market',
-    assets_ids:batch,
-    custom_feature_enabled:true
-   }));
-   batch.forEach(id=>state.subscribed.add(id));
-  }catch(e){console.error('Subscribe failed',e)}
- }
- if($('subCount'))$('subCount').textContent=String(state.subscribed.size);
-}
-function connect(){
- const ws=new WebSocket(WS_URL);state.socket=ws;
- if($('wsState'))$('wsState').textContent='CONNECTING';
- ws.onopen=()=>{
-  if(state.socket!==ws)return;
-  state.wsState='CONNECTED';
-  if($('wsState'))$('wsState').textContent='CONNECTED';
-  subscribe();
- };
- ws.onmessage=e=>{
-  if(state.socket!==ws)return;
-  if(e.data==='PONG')return;
-  state.msgCount++;state.lastMessageAt=Date.now();
-  state.packetTimes.push(Date.now());
-  state.packetTimes=state.packetTimes.filter(t=>t>Date.now()-1000);
-  if($('msgCount'))$('msgCount').textContent=String(state.msgCount);
-  if($('packetRate'))$('packetRate').textContent=String(state.packetTimes.length);
-  let data;try{data=JSON.parse(e.data)}catch{return}
-  let changed=false;
-  for(const m of (Array.isArray(data)?data:[data])){
-   changed=handleMessage(m)||changed;
-  }
-  if(changed)render();
- };
- ws.onerror=()=>{if($('wsState'))$('wsState').textContent='ERROR'};
- ws.onclose=()=>{
-  if(state.socket!==ws)return;
-  state.wsState='DISCONNECTED';
-  if($('wsState'))$('wsState').textContent='DISCONNECTED';
-  state.subscribed.clear();
-  setTimeout(()=>{if(state.socket===ws)connect()},1500);
- };
- setInterval(()=>{
-  if(ws.readyState===WebSocket.OPEN)try{ws.send('PING')}catch(e){}
- },10000);
-}
-async function loadMatches(){
- if(state.loading)return;
- state.loading=true;
- const generation=++state.generation;
- try{
-  const all=[],seen=new Set();
-  let offset=0;
-  for(let page=0;page<8;page++){
-   const url=new URL('/matches',WORKER);
-   url.searchParams.set('sport',state.sport==='all'?'all':state.sport);
-   url.searchParams.set('offset',offset);
-   url.searchParams.set('limit',100);
-   const r=await fetch(url,{cache:'no-store'});
-   if(!r.ok)throw Error('Worker HTTP '+r.status);
-   const d=await r.json();
-   if(generation!==state.generation)return;
-   const rows=Array.isArray(d.data)?d.data:[];
-   for(const raw of rows){
-    const m=norm(raw);
-    if(!seen.has(m.id)&&m.sport&&m.tokens.length>=2){
-     seen.add(m.id);all.push(m);
-    }
-   }
-   if(!d.hasMore||!rows.length)break;
-   const next=Number(d.nextOffset??offset+rows.length);
-   if(next<=offset)break;
-   offset=next;
-  }
-  state.matches=all;
-  if($('gammaStatus'))$('gammaStatus').textContent='OK · '+all.length;
-  subscribe();render();
- }catch(e){
-  if($('gammaStatus'))$('gammaStatus').textContent='ERROR';
-  if($('statusText'))$('statusText').textContent='Worker: '+e.message;
- }finally{state.loading=false}
-}
-function cents(p){return p==null?'—':Math.round(p*100)+'¢'}
-function dec(p){return p==null?'—':(1/p).toFixed(2)}
-function outcome(t){
- const q=state.quotes.get(t.id)||{bid:null,ask:null};
- return '<div class="outcome"><div class="outname">'+esc(t.name)+'</div><div class="quoteRow">'+
- '<div class="quoteSide"><div class="quoteLabel">BUY · best ask</div><div class="cents">'+cents(q.ask)+'</div><div class="decimal">Decimal '+dec(q.ask)+'</div></div>'+
- '<div class="quoteSide right"><div class="quoteLabel">SELL · best bid</div><div class="cents">'+cents(q.bid)+'</div><div class="decimal">Decimal '+dec(q.bid)+'</div></div></div></div>';
-}
-function matchDate(m){
- const slug=String(m.slug||'').match(/\d{4}-\d{2}-\d{2}/);
- const n=slug?Date.parse(slug[0]+'T12:00:00Z'):Date.parse(m.startDate||'');
- return Number.isFinite(n)?n:0;
-}
-function render(){
- if(!$('cards'))return;
- const now=Date.now();
- const key=n=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(n));
- const today=key(now),tomorrow=key(now+86400000);
- let list=state.matches.filter(m=>{
-  if(state.sport!=='all'&&m.sport!==state.sport)return false;
-  if(state.search&&!((m.title+' '+m.tokens.map(t=>t.name).join(' ')).toLowerCase().includes(state.search.toLowerCase())))return false;
-  const d=matchDate(m);
-  if(state.time==='today')return d&&key(d)===today;
-  if(state.time==='tomorrow')return d&&key(d)===tomorrow;
-  if(state.time==='live')return m.live===true||/live|inprogress/i.test(String(m.status||''));
-  if(state.time==='upcoming')return d>now;
-  return true;
- });
- list.sort((a,b)=>state.sort==='name'?a.title.localeCompare(b.title):(matchDate(a)||Infinity)-(matchDate(b)||Infinity));
- if($('matchCount'))$('matchCount').textContent=String(list.length);
- if(!list.length){$('cards').innerHTML='<div class="empty">No matches for this filter. Try All matches.</div>';return}
- $('cards').innerHTML=list.map(m=>{
-  const url=m.eventUrl||m.event_url||(m.slug?'https://polymarket.com/event/'+m.slug:'');
-  const sport=m.sport==='cricket'?'🏏 CRICKET':m.sport==='tennis'?'🎾 TENNIS':'⚽ FOOTBALL';
-  const date=matchDate(m)?new Intl.DateTimeFormat('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(matchDate(m))):'Time TBA';
-  return '<article class="card"><div class="cardtop"><div><div class="sporttag">'+sport+'</div><div class="matchtitle">'+esc(m.title)+'</div></div><div class="time">'+date+'</div></div>'+
-   '<div class="outcomes">'+m.tokens.slice(0,2).map(outcome).join('')+'</div>'+
-   '<div class="cardfoot"><span>Volume: '+(m.volume?esc(m.volume):'—')+'</span><span>'+
-   (url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">Open market ↗</a> ':'')+
-   '<button class="textbtn" data-markets="'+esc(m.id)+'">All Markets</button></span></div></article>';
- }).join('');
-}
-async function showMarkets(id){
- const m=state.matches.find(x=>x.id===id);if(!m)return;
- $('modalTitle').textContent=m.title;
- $('modalContent')&&($('modalContent').textContent='Loading markets…');
- $('marketContent').textContent='Loading markets…';
- $('modal').classList.add('open');
- try{
-  let d=state.marketCache.get(id);
-  if(!d){
-   const url=new URL('/event',WORKER);url.searchParams.set('id',id);
-   const r=await fetch(url,{cache:'no-store'});
-   if(!r.ok)throw Error('Worker HTTP '+r.status);
-   d=await r.json();state.marketCache.set(id,d);
-  }
-  let markets=Array.isArray(d.markets)?d.markets:
-   Array.isArray(d.data)?d.data:
-   Array.isArray(d.event?.markets)?d.event.markets:[];
-  if(!markets.length&&Array.isArray(d.events))markets=d.events;
-  if(!markets.length){
-   const link=m.eventUrl||m.url||'';
-   $('marketContent').innerHTML='<div class="marketitem"><strong>'+esc(m.marketQuestion||m.title)+'</strong><p>Worker ne additional markets return nahi kiye.</p>'+(link?'<a href="'+esc(link)+'" target="_blank" rel="noopener">Open Polymarket ↗</a>':'')+'</div>';
-   return;
-  }
-  $('marketContent').innerHTML=markets.map(x=>{
-   const title=x.question||x.marketQuestion||x.title||x.groupItemTitle||'Market';
-   const href=x.url||x.marketUrl||x.market_url||'';
-   return '<div class="marketitem"><strong>'+esc(title)+'</strong>'+
-    (href.startsWith('http')?'<br><a target="_blank" rel="noopener" href="'+esc(href)+'">Open market ↗</a>':'')+'</div>';
-  }).join('');
- }catch(e){
-  $('marketContent').innerHTML='<div class="empty">Markets load nahi hue: '+esc(e.message)+'<br>Main match list available rahegi.</div>';
- }
-}
-$('sports')?.addEventListener('click',e=>{
- const b=e.target.closest('[data-sport]');if(!b)return;
- state.sport=b.dataset.sport;
- $('sports').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));
- loadMatches();
-});
-$('times')?.addEventListener('click',e=>{
- const b=e.target.closest('[data-time]');if(!b)return;
- state.time=b.dataset.time;
- $('times').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));
- render();
-});
-$('search')?.addEventListener('input',e=>{state.search=e.target.value.trim();render()});
-$('sort')?.addEventListener('change',e=>{state.sort=e.target.value;render()});
-$('refresh')?.addEventListener('click',loadMatches);
-$('cards')?.addEventListener('click',e=>{
- const b=e.target.closest('button[data-markets]');
- if(b){e.preventDefault();showMarkets(b.getAttribute('data-markets'))}
-});
-$('closeModal')?.addEventListener('click',()=>$('modal').classList.remove('open'));
-$('modal')?.addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('open')});
-setInterval(()=>{
- if($('packetRate'))$('packetRate').textContent=String(state.packetTimes.filter(t=>t>Date.now()-1000).length);
- if($('latency'))$('latency').textContent='Last packet '+(state.lastMessageAt?Date.now()-state.lastMessageAt+' ms':'—');
-},1000);
-setInterval(loadMatches,30000);
-connect();
-loadMatches();
-})();
+const S={matches:[],sport:'all',time:'today',query:'',quotes:{},ws:null,retry:null,reconnects:0,packets:0,lastPacket:0,lastQuote:0,packetTimes:[],renderMs:null,restMs:null,subscribed:new Set(),active:null,restSnapshots:{},seenPrices:{},busy:false};
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dec=p=>{p=Number(p);return Number.isFinite(p)&&p>0&&p<=1?(1/p).toFixed(2):'—'};
+const cents=p=>{p=Number(p);return Number.isFinite(p)&&p>=0&&p<=1?Math.round(p*100)+'¢':'—'};
+const num=x=>Number.isFinite(Number(x))?Number(x):null;
+function dateFrom(m){const raw=m.slug&&m.slug.match(/(20\d\d-\d\d-\d\d)/)?.[1];if(raw)return new Date(raw+'T12:00:00');const d=m.startDate||m.date||m.endDate;const x=d?new Date(d):null;return x&&!isNaN(x)?x:null}
+function dayKey(d){return d?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`:''}
+function live(m){return m.live===true||String(m.status||'').toLowerCase()==='live'}
+function getTokens(m){if(Array.isArray(m.tokens)&&m.tokens.length)return m.tokens.map((t,i)=>({id:String(t.id||t.token_id||m.clobTokenIds?.[i]||''),name:String(t.name||m.outcomes?.[i]||`Outcome ${i+1}`)})).filter(t=>t.id);const ids=m.clobTokenIds||m.tokenIds||[];const outs=m.outcomes||[];return ids.map((id,i)=>({id:String(id),name:String(outs[i]||`Outcome ${i+1}`)})).filter(t=>t.id&&t.id!=='undefined')}
+function getMarkets(m){if(Array.isArray(m.markets)&&m.markets.length)return m.markets.map(mk=>({...mk,tokenIds:mk.tokenIds||mk.clobTokenIds||[]}));const tokens=getTokens(m);return tokens.length?[{question:m.marketQuestion||m.question||'Match winner',outcomes:tokens.map(t=>t.name),tokenIds:tokens.map(t=>t.id),url:m.marketUrl||m.eventUrl||m.url}]:[]}
+function tokenList(m){return [...new Set(getTokens(m).map(t=>t.id).concat(getMarkets(m).flatMap(mk=>mk.tokenIds||[]).map(String)).filter(Boolean))]}
+function quote(id){return S.quotes[id]||{}}
+function visible(m){const sport=String(m.sport||'').toLowerCase();if(S.sport!=='all'&&!(S.sport==='football'&&(sport==='football'||sport==='soccer'))&&sport!==S.sport)return false;const hay=[m.title,m.marketQuestion,m.question,m.slug,m.sport].join(' ').toLowerCase();if(S.query&&!hay.includes(S.query))return false;const d=dateFrom(m),today=new Date(),tom=new Date();tom.setDate(tom.getDate()+1);if(S.time==='live')return live(m);if(S.time==='today')return !!d&&dayKey(d)===dayKey(today);if(S.time==='tomorrow')return !!d&&dayKey(d)===dayKey(tom);return true}
+function render(){const list=S.matches.filter(visible);if(!list.length){$('matches').innerHTML='<div class="empty">No matches for this filter. Try ALL or search another team.</div>';return} $('matches').innerHTML=list.map(m=>{const ts=getTokens(m),t0=ts[0],t1=ts[1],q0=t0?quote(t0.id):{},q1=t1?quote(t1.id):{};const d=dateFrom(m);const status=live(m)?'LIVE':d?d.toLocaleDateString([],{month:'short',day:'numeric'}):'Date unavailable';const title=m.title||m.question||'Polymarket match';return `<article class="card"><div class="meta"><span>${esc(String(m.sport||'').toUpperCase()==='SOCCER'?'FOOTBALL':m.sport||'SPORT')}</span><span>${esc(status)}</span></div><div class="matchtitle">${esc(title)}</div><div class="teams">${teamBox(t0,q0,'Team A')}${teamBox(t1,q1,'Team B')}</div><div class="cardfoot"><span>${q0.at||q1.at?'Quote '+Math.floor((Date.now()-Math.max(q0.at||0,q1.at||0))/1000)+'s ago':'Waiting for live quote'}</span><button data-detail="${esc(m.id||m.eventId||m.slug||'')}">Match Details ↗</button></div></article>`}).join('');$('matches').querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>showDetail(b.dataset.detail))}
+function teamBox(t,q,fallback){if(!t)return `<div class="team"><div class="teamname">${fallback}</div><div class="prices"><div class="pricecell"><div class="cents">—</div><div class="decimal">—</div></div><div class="pricecell"><div class="cents">—</div><div class="decimal">—</div></div></div></div>`;return `<div class="team"><div class="teamname" title="${esc(t.name)}">${esc(t.name)}</div><div class="prices"><div class="pricecell"><div class="cents">${cents(q.bid)}</div><div class="decimal">${dec(q.bid)}</div></div><div class="pricecell"><div class="cents">${cents(q.ask)}</div><div class="decimal">${dec(q.ask)}</div></div></div></div>`}
+function metrics(){const now=Date.now(),recent=S.packetTimes.filter(t=>now-t<1000).length;$('packets').textContent=S.packets.toLocaleString();$('pps').textContent=recent+'/s';$('ppms').textContent=(recent/1000).toFixed(3);$('packetAge').textContent=S.lastPacket?Math.max(0,now-S.lastPacket)+' ms':'—';$('renderMs').textContent=S.renderMs==null?'—':S.renderMs+' ms';$('restMs').textContent=S.restMs==null?'—':S.restMs+' ms';$('reconnects').textContent=S.reconnects;$('quoteAge').textContent=S.lastQuote?Math.floor((now-S.lastQuote)/1000)+' s':'—';$('socketCount').textContent=S.subscribed.size;$('wsState').textContent=S.ws&&S.ws.readyState===1?'CONNECTED':S.ws&&S.ws.readyState===0?'CONNECTING':'DISCONNECTED';if($('details').open&&S.active)refreshDetailPush()}
+function subscribeTokens(tokens){const ws=S.ws;if(!ws||ws.readyState!==1)return;const fresh=[...new Set(tokens.map(String).filter(Boolean))].filter(id=>!S.subscribed.has(id));if(!fresh.length)return;for(let i=0;i<fresh.length;i+=100){const ids=fresh.slice(i,i+100);try{ws.send(JSON.stringify({type:'market',assets_ids:ids,custom_feature_enabled:true}));ids.forEach(id=>S.subscribed.add(id))}catch(e){$('status').textContent='Subscribe error: '+e.message}}metrics()}
+function connect(){if(S.ws){S.ws.onclose=null;try{S.ws.close()}catch{}}S.subscribed.clear();let ws;try{ws=new WebSocket(WS_URL)}catch(e){$('status').textContent='WebSocket error: '+e.message;return}S.ws=ws;metrics();ws.onopen=()=>{if(S.ws!==ws)return;S.subscribed.clear();subscribeTokens(S.matches.flatMap(tokenList));$('status').textContent='Worker connected · Polymarket CLOB WebSocket connected';};ws.onmessage=e=>{if(S.ws!==ws)return;handleMessage(e.data)};ws.onerror=()=>{$('status').textContent='WebSocket error; reconnecting…'};ws.onclose=()=>{if(S.ws!==ws)return;S.subscribed.clear();metrics();S.reconnects++;if(S.retry)clearTimeout(S.retry);S.retry=setTimeout(connect,1500);$('status').textContent='Socket disconnected · reconnecting…'};}
+function setQuote(id,bid,ask,source){if(!id)return;const old=quote(id),n={...old};if(bid!==undefined&&bid!==null&&bid!==''&&Number.isFinite(Number(bid)))n.bid=Number(bid);if(ask!==undefined&&ask!==null&&ask!==''&&Number.isFinite(Number(ask)))n.ask=Number(ask);n.at=Date.now();n.source=source;S.quotes[id]=n;S.lastQuote=n.at;const key=id+':'+String(n.bid)+':'+String(n.ask);if(!S.seenPrices[key])S.seenPrices[key]={source,at:n.at};if(S.active&&S.detailsTokens?.has(id))refreshDetailPush()}
+function handleMessage(raw){const begin=performance.now();let data;try{data=JSON.parse(raw)}catch{return}const arr=Array.isArray(data)?data:[data];for(const ev of arr){const now=Date.now();S.packets++;S.lastPacket=now;S.packetTimes.push(now);S.packetTimes=S.packetTimes.filter(t=>now-t<5000);const type=String(ev.event_type||ev.type||'').toLowerCase();if(type==='price_change'&&Array.isArray(ev.price_changes)){for(const ch of ev.price_changes)setQuote(String(ch.asset_id||''),ch.best_bid,ch.best_ask,'push');continue}const id=String(ev.asset_id||ev.token_id||ev.assetId||'');if(type==='book'||(Array.isArray(ev.bids)&&Array.isArray(ev.asks))){const bids=Array.isArray(ev.bids)?ev.bids:[],asks=Array.isArray(ev.asks)?ev.asks:[];const b=bids.map(x=>Number(x.price)).filter(x=>Number.isFinite(x)&&x>0).sort((a,b)=>b-a)[0];const a=asks.map(x=>Number(x.price)).filter(x=>Number.isFinite(x)&&x>0).sort((a,b)=>a-b)[0];setQuote(id,b,a,'push')}else if(type==='best_bid_ask'||ev.best_bid!==undefined||ev.best_ask!==undefined){setQuote(id,ev.best_bid??ev.bestBid,ev.best_ask??ev.bestAsk,'push')}}S.renderMs=Math.max(0,Math.round((performance.now()-begin)*100)/100);render();metrics()}
+async function refresh(){if(S.busy)return;S.busy=true;$('refresh').disabled=true;$('status').textContent='Loading matches from current Cloudflare Worker…';const start=performance.now();try{let all=[],offset=0,limit=100;for(let page=0;page<8;page++){const u=new URL(WORKER+'/matches');u.searchParams.set('sport',S.sport==='football'?'all':S.sport);u.searchParams.set('limit',String(limit));u.searchParams.set('offset',String(offset));const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('Worker HTTP '+r.status);const j=await r.json();const batch=Array.isArray(j.data)?j.data:Array.isArray(j.matches)?j.matches:Array.isArray(j.results)?j.results:[];all.push(...batch);if(batch.length<limit||j.hasMore===false)break;offset=Number(j.nextOffset??offset+batch.length);if(!Number.isFinite(offset)||offset<=0)break;}const seen=new Set();S.matches=all.filter(m=>{const id=String(m.id||m.eventId||m.slug||m.title);if(seen.has(id))return false;seen.add(id);return true}).map(normalize);S.restMs=Math.round(performance.now()-start);$('status').textContent=`Worker OK · ${S.matches.length} matches · discovery ${S.restMs} ms`;render();if(S.ws&&S.ws.readyState===1)subscribeTokens(S.matches.flatMap(tokenList));if(!S.matches.length)$('matches').innerHTML='<div class="empty">Worker responded, but no matches were returned. Check /matches endpoint response.</div>'}catch(e){$('status').textContent='Load error: '+e.message;if(!S.matches.length)$('matches').innerHTML='<div class="empty">Could not load matches. Confirm Worker URL and /matches endpoint.</div>'}finally{S.busy=false;$('refresh').disabled=false;metrics()}}
+function normalize(m){const t=getTokens(m);return {...m,id:String(m.id||m.eventId||m.slug||m.title),title:m.title||m.name||m.marketQuestion||'Match',sport:String(m.sport||'').toLowerCase()==='soccer'?'football':String(m.sport||'').toLowerCase(),tokens:t,tokenIds:t.map(x=>x.id),outcomes:t.map(x=>x.name),markets:getMarkets(m),url:m.eventUrl||m.marketUrl||m.url||''}}
+async function showDetail(id){const m=S.matches.find(x=>String(x.id)===String(id));if(!m)return;S.active=id;S.detailsTokens=new Set(tokenList(m));$('detailTitle').textContent=m.title;$('detailStatus').textContent='Loading public order-book snapshot and listening to live push…';$('pushInfo').textContent='Waiting for WebSocket quotes…';$('restInfo').textContent='Requesting public CLOB order books…';$('detailBody').innerHTML='';$('details').showModal();if(S.ws&&S.ws.readyState===1)subscribeTokens([...S.detailsTokens]);renderDetailMarkets(m);await fetchRestComparison(m);refreshDetailPush()}
+function renderDetailMarkets(m){const markets=m.markets||[];$('detailBody').innerHTML=markets.map(mk=>`<div class="marketrow"><h3>${esc(mk.question||'Market')}</h3><div class="marketout">${(mk.outcomes||[]).map((o,i)=>{const id=String((mk.tokenIds||[])[i]||'');const q=quote(id);return `<div class="outcome"><div class="outname">${esc(o)}</div><div class="outvals">${cents(q.bid)} · ${dec(q.bid)}<br>${cents(q.ask)} · ${dec(q.ask)}</div></div>`}).join('')}</div></div>`).join('')+(m.url?`<p><a class="link" target="_blank" rel="noopener" href="${esc(m.url)}">Open on Polymarket ↗</a></p>`:'')}
+function refreshDetailPush(){if(!S.active)return;const m=S.matches.find(x=>String(x.id)===String(S.active));if(!m)return;const ts=getTokens(m);$('pushInfo').innerHTML=ts.map(t=>{const q=quote(t.id);return `<div>${esc(t.name)}: ${cents(q.bid)} / ${cents(q.ask)} <span style="color:#666">(${dec(q.bid)} / ${dec(q.ask)})</span></div>`}).join('')||'No token IDs found';if($('details').open)renderDetailMarkets(m)}
+async function fetchRestComparison(m){const tokens=getTokens(m);if(!tokens.length){$('restInfo').textContent='No token IDs available for REST comparison.';return}const start=performance.now(),rows=[];for(const t of tokens.slice(0,4)){try{const u='https://clob.polymarket.com/book?token_id='+encodeURIComponent(t.id);const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const b=await r.json();const bids=Array.isArray(b.bids)?b.bids:[],asks=Array.isArray(b.asks)?b.asks:[];const bid=bids.map(x=>Number(x.price)).filter(x=>x>0).sort((a,b)=>b-a)[0];const ask=asks.map(x=>Number(x.price)).filter(x=>x>0).sort((a,b)=>a-b)[0];S.restSnapshots[t.id]={bid,ask,at:Date.now(),name:t.name};rows.push(`${esc(t.name)}: ${cents(bid)} / ${cents(ask)} (${dec(bid)} / ${dec(ask)})`)}catch(e){rows.push(`${esc(t.name)}: REST unavailable (${esc(e.message)})`)}}const ms=Math.round(performance.now()-start);S.restMs=ms;$('restInfo').innerHTML=`${rows.join('<br>')}<br><span style="color:#666">Snapshot request sequence: ${ms} ms</span>`;const pushes=tokens.map(t=>S.quotes[t.id]?.at).filter(Boolean);if(pushes.length){const firstPush=Math.min(...pushes);$('detailStatus').textContent=`Push quote received ${Math.max(0,Date.now()-firstPush)} ms ago · REST snapshot sequence ${ms} ms. REST duration is not the same as source update latency.`}else $('detailStatus').textContent=`REST snapshot completed in ${ms} ms · waiting for push quote. Browser cannot observe Polymarket website's internal push timing.`;metrics()}
+$('closeDetails').onclick=()=>{$('details').close();S.active=null;S.detailsTokens=new Set()};$('details').addEventListener('click',e=>{if(e.target===$('details')){$('details').close();S.active=null;S.detailsTokens=new Set()}});
+$('sports').onclick=e=>{const b=e.target.closest('[data-sport]');if(!b)return;S.sport=b.dataset.sport;$('sports').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));refresh()};$('times').onclick=e=>{const b=e.target.closest('[data-time]');if(!b)return;S.time=b.dataset.time;$('times').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));render()};let st;$('search').addEventListener('input',e=>{S.query=e.target.value.trim().toLowerCase();clearTimeout(st);st=setTimeout(render,100)});$('refresh').onclick=refresh;setInterval(metrics,250);refresh().then(connect);
 </script>
 </body>
 </html>
-
