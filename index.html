@@ -260,20 +260,25 @@ function updateQuote(id,patch,source="push"){
  if(S.race&&S.race.active&&S.race.token===id&&source==="push")recordPush(next,changed);
 }
 function filtered(){
- const q=S.search.trim().toLowerCase();
- return S.matches.filter(m=>{
-  if(S.sport!=="all"&&sport(m)!==S.sport)return false;
+ const q = S.search.trim().toLowerCase();
 
-  if(S.filter==="live"&&!live(m))return false;
+ return S.matches.filter(m => {
+  if(S.sport !== "all" && sport(m) !== S.sport) return false;
 
-  // Prefer Worker dateKey; startDate can be an older event-creation date.
-  const date=String(m.dateKey||dayKey(m.startDate||m.start_date||m.date)||"").slice(0,10);
+  if(S.filter === "live" && !live(m)) return false;
 
-  if(S.filter==="today"&&date!==todayKey(0))return false;
-  if(S.filter==="tomorrow"&&date!==todayKey(1))return false;
+  const date = String(
+   m.dateKey ||
+   m.slug?.match(/(\d{4}-\d{2}-\d{2})/)?.[1] ||
+   ""
+  ).slice(0,10);
 
-  return !q||`${title(m)} ${m.slug||""} ${tokens(m).map(t=>t.name).join(" ")}`
-    .toLowerCase().includes(q);
+  if(S.filter === "today" && date !== todayKey(0)) return false;
+  if(S.filter === "tomorrow" && date !== todayKey(1)) return false;
+
+  return !q || (
+   `${title(m)} ${m.slug || ""} ${tokens(m).map(t => t.name).join(" ")}`
+  ).toLowerCase().includes(q);
  });
 }
 function qhtml(id,side,label){
