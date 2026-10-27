@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -39,7 +38,6 @@ main{max-width:850px;margin:auto;padding:9px 9px calc(25px + env(safe-area-inset
 .teamname{font-weight:700;font-size:11px;line-height:1.4;min-height:28px;overflow-wrap:anywhere}
 .quote{background:var(--soft);border-radius:7px;margin-top:6px;padding:7px}
 .qline{display:flex;justify-content:space-between;align-items:center;gap:4px}
-.qline+.qline{margin-top:6px}
 .qlabel{font-size:9px;color:var(--muted)}
 .price{font-size:14px;font-weight:850;font-variant-numeric:tabular-nums}
 .decimal{font-size:10px;color:#555;margin-top:3px}
@@ -78,620 +76,446 @@ main{max-width:850px;margin:auto;padding:9px 9px calc(25px + env(safe-area-inset
 </head>
 <body>
 <header>
-  <div class="top">
-    <div><div class="brand">◇ CRYSTAL EDGE</div><div class="sub">POLYMARKET · LIVE SPORTS</div></div>
-    <button id="refresh">↻ Refresh</button>
-  </div>
+ <div class="top">
+  <div><div class="brand">◇ CRYSTAL EDGE</div><div class="sub">POLYMARKET · LIVE SPORTS</div></div>
+  <button id="refresh">↻ Refresh</button>
+ </div>
 </header>
 <main>
-  <div class="sports" id="sports">
-    <button class="active" data-sport="all" aria-label="All sports">◎</button>
-    <button data-sport="cricket" aria-label="Cricket">🏏</button>
-    <button data-sport="tennis" aria-label="Tennis">🎾</button>
-    <button data-sport="soccer" aria-label="Football">⚽</button>
+ <div class="sports" id="sports">
+  <button class="active" data-sport="all" aria-label="All sports">◎</button>
+  <button data-sport="cricket" aria-label="Cricket">🏏</button>
+  <button data-sport="tennis" aria-label="Tennis">🎾</button>
+  <button data-sport="football" aria-label="Football">⚽</button>
+ </div>
+ <input id="search" class="search" type="search" placeholder="Search matches or teams…" autocomplete="off">
+ <div class="filters" id="filters">
+  <button class="active" data-filter="all">All</button>
+  <button data-filter="live">Live</button>
+  <button data-filter="today">Today</button>
+  <button data-filter="tomorrow">Tomorrow</button>
+ </div>
+ <div class="status" id="topStatus">Connecting to Worker…</div>
+ <section class="telemetry">
+  <h3>LIVE FEED · DIAGNOSTICS</h3>
+  <div class="stats">
+   <div class="stat"><label>WebSocket</label><b id="wsState">Connecting</b></div>
+   <div class="stat"><label>Matches loaded</label><b id="matchCount">0</b></div>
+   <div class="stat"><label>Subscribed tokens</label><b id="tokenCount">0</b></div>
+   <div class="stat"><label>Packets received</label><b id="packets">0</b></div>
+   <div class="stat"><label>Price updates</label><b id="updates">0</b></div>
+   <div class="stat"><label>Packets/sec</label><b id="pps">0</b></div>
+   <div class="stat"><label>Last packet age</label><b id="packetAge">—</b></div>
+   <div class="stat"><label>Last fetch time</label><b id="fetchTime">—</b></div>
+   <div class="stat"><label>Fetch duration</label><b id="fetchMs">—</b></div>
+   <div class="stat"><label>Last UI render</label><b id="renderMs">—</b></div>
+   <div class="stat"><label>Newest quote age</label><b id="quoteAge">—</b></div>
+   <div class="stat"><label>Worker status</label><b id="workerState">Waiting</b></div>
   </div>
-  <input id="search" class="search" type="search" placeholder="Search matches or teams…" autocomplete="off">
-  <div class="filters" id="filters">
-    <button class="active" data-filter="all">All</button>
-    <button data-filter="live">Live</button>
-    <button data-filter="today">Today</button>
-    <button data-filter="tomorrow">Tomorrow</button>
-  </div>
-
-  <div class="status" id="topStatus">Connecting to Worker…</div>
-
-  <section class="telemetry">
-    <h3>LIVE FEED · DIAGNOSTICS</h3>
-    <div class="stats">
-      <div class="stat"><label>WebSocket</label><b id="wsState">Connecting</b></div>
-      <div class="stat"><label>Matches loaded</label><b id="matchCount">0</b></div>
-      <div class="stat"><label>Subscribed tokens</label><b id="tokenCount">0</b></div>
-      <div class="stat"><label>Packets received</label><b id="packets">0</b></div>
-      <div class="stat"><label>Price updates</label><b id="updates">0</b></div>
-      <div class="stat"><label>Packets/sec</label><b id="pps">0</b></div>
-      <div class="stat"><label>Last packet age</label><b id="packetAge">—</b></div>
-      <div class="stat"><label>Last fetch time</label><b id="fetchTime">—</b></div>
-      <div class="stat"><label>Fetch duration</label><b id="fetchMs">—</b></div>
-      <div class="stat"><label>Last UI render</label><b id="renderMs">—</b></div>
-      <div class="stat"><label>Newest quote age</label><b id="quoteAge">—</b></div>
-      <div class="stat"><label>Worker status</label><b id="workerState">Waiting</b></div>
-    </div>
-  </section>
-
-  <section id="matches"><div class="empty">Loading matches…</div></section>
+ </section>
+ <section id="matches"><div class="empty">Loading matches…</div></section>
 </main>
 
 <section id="race" class="hidden">
-  <div class="racehead">
-    <div><div class="racetitle">PUSH vs PUBLIC</div><div class="racemeta">Same token · measured in this browser</div></div>
-    <button id="closeRace">✕</button>
-  </div>
-  <div id="raceMatch"></div>
-  <div class="tokenrow"><select id="raceToken" aria-label="Choose outcome token"></select></div>
-
-  <div class="racegrid">
-    <article class="feed">
-      <div class="feedhead"><strong>⚡ Push WebSocket</strong><span id="pushState">Connecting…</span></div>
-      <div class="feedbody">
-        <div class="feedrow"><div class="feedlabel">Best bid · LAY</div><div id="pushBid" class="feedprice">—</div><div id="pushBidDec" class="feeddecimal">Decimal —</div><div id="pushBidSize" class="feedsize"></div></div>
-        <div class="feedrow"><div class="feedlabel">Best ask · BACK</div><div id="pushAsk" class="feedprice">—</div><div id="pushAskDec" class="feeddecimal">Decimal —</div><div id="pushAskSize" class="feedsize"></div></div>
-        <div class="feedrow"><div class="feedlabel">First observed price change</div><div id="pushFirst" class="feeddecimal">—</div></div>
-        <div class="feedrow"><div class="feedlabel">Observed changes</div><div id="pushChanges" class="feedprice">0</div></div>
-        <div class="metricsTitle">PUSH LATENCY MEASURES</div>
-        <div class="feedstats">
-          <div class="fstat"><label>Connection</label><b id="pushConn">—</b></div>
-          <div class="fstat"><label>Packets</label><b id="pushPackets">0</b></div>
-          <div class="fstat"><label>Last packet age</label><b id="pushAge">—</b></div>
-          <div class="fstat"><label>Processing time</label><b id="pushProcess">—</b></div>
-          <div class="fstat"><label>Quote age</label><b id="pushQuoteAge">—</b></div>
-          <div class="fstat"><label>Time to first change</label><b id="pushFirstLatency">—</b></div>
-        </div>
-        <div id="pushInfo" class="feedstatus">Waiting for feed data.</div>
-      </div>
-    </article>
-
-    <article class="feed">
-      <div class="feedhead"><strong>Public CLOB REST</strong><span id="restState">Starting polling…</span></div>
-      <div class="feedbody">
-        <div class="feedrow"><div class="feedlabel">Best bid · LAY</div><div id="restBid" class="feedprice">—</div><div id="restBidDec" class="feeddecimal">Decimal —</div><div id="restBidSize" class="feedsize"></div></div>
-        <div class="feedrow"><div class="feedlabel">Best ask · BACK</div><div id="restAsk" class="feedprice">—</div><div id="restAskDec" class="feeddecimal">Decimal —</div><div id="restAskSize" class="feedsize"></div></div>
-        <div class="feedrow"><div class="feedlabel">First observed price change</div><div id="restFirst" class="feeddecimal">—</div></div>
-        <div class="feedrow"><div class="feedlabel">Observed changes</div><div id="restChanges" class="feedprice">0</div></div>
-        <div class="metricsTitle">PUBLIC REST MEASURES</div>
-        <div class="feedstats">
-          <div class="fstat"><label>Requests sent</label><b id="restRequests">0</b></div>
-          <div class="fstat"><label>Successful responses</label><b id="restSuccess">0</b></div>
-          <div class="fstat"><label>Last request RTT</label><b id="restRTT">—</b></div>
-          <div class="fstat"><label>Average request RTT</label><b id="restAvg">—</b></div>
-          <div class="fstat"><label>Last response age</label><b id="restAge">—</b></div>
-          <div class="fstat"><label>Time to first change</label><b id="restFirstLatency">—</b></div>
-        </div>
-        <div id="restInfo" class="feedstatus">Waiting for REST response.</div>
-      </div>
-    </article>
-  </div>
-  <button id="stopRace">Stop &amp; Result</button>
-  <div id="raceResult" class="result hidden" aria-live="polite"></div>
-  <div class="note">“Connected” and “price changed” are different states. REST is sampled polling and may miss intermediate changes. Browser timings are not exchange-side latency measurements.</div>
+ <div class="racehead">
+  <div><div class="racetitle">PUSH vs PUBLIC</div><div class="racemeta">Same token · browser-observed timings</div></div>
+  <button id="closeRace">✕</button>
+ </div>
+ <div id="raceMatch"></div>
+ <div class="tokenrow"><select id="raceToken" aria-label="Choose outcome token"></select></div>
+ <div class="racegrid">
+  <article class="feed">
+   <div class="feedhead"><strong>⚡ Push WebSocket</strong><span id="pushState">Connecting…</span></div>
+   <div class="feedbody">
+    <div class="feedrow"><div class="feedlabel">Best bid · LAY</div><div id="pushBid" class="feedprice">—</div><div id="pushBidDec" class="feeddecimal">Decimal —</div><div id="pushBidSize" class="feedsize"></div></div>
+    <div class="feedrow"><div class="feedlabel">Best ask · BACK</div><div id="pushAsk" class="feedprice">—</div><div id="pushAskDec" class="feeddecimal">Decimal —</div><div id="pushAskSize" class="feedsize"></div></div>
+    <div class="feedrow"><div class="feedlabel">First observed price change</div><div id="pushFirst" class="feeddecimal">—</div></div>
+    <div class="feedrow"><div class="feedlabel">Observed changes</div><div id="pushChanges" class="feedprice">0</div></div>
+    <div class="metricsTitle">PUSH MEASURES</div>
+    <div class="feedstats">
+     <div class="fstat"><label>Connection</label><b id="pushConn">—</b></div>
+     <div class="fstat"><label>Packets</label><b id="pushPackets">0</b></div>
+     <div class="fstat"><label>Last packet age</label><b id="pushAge">—</b></div>
+     <div class="fstat"><label>Processing time</label><b id="pushProcess">—</b></div>
+     <div class="fstat"><label>Quote age</label><b id="pushQuoteAge">—</b></div>
+     <div class="fstat"><label>Time to first change</label><b id="pushFirstLatency">—</b></div>
+    </div>
+    <div id="pushInfo" class="feedstatus">Waiting for feed data.</div>
+   </div>
+  </article>
+  <article class="feed">
+   <div class="feedhead"><strong>Public CLOB REST</strong><span id="restState">Starting polling…</span></div>
+   <div class="feedbody">
+    <div class="feedrow"><div class="feedlabel">Best bid · LAY</div><div id="restBid" class="feedprice">—</div><div id="restBidDec" class="feeddecimal">Decimal —</div><div id="restBidSize" class="feedsize"></div></div>
+    <div class="feedrow"><div class="feedlabel">Best ask · BACK</div><div id="restAsk" class="feedprice">—</div><div id="restAskDec" class="feeddecimal">Decimal —</div><div id="restAskSize" class="feedsize"></div></div>
+    <div class="feedrow"><div class="feedlabel">First observed price change</div><div id="restFirst" class="feeddecimal">—</div></div>
+    <div class="feedrow"><div class="feedlabel">Observed changes</div><div id="restChanges" class="feedprice">0</div></div>
+    <div class="metricsTitle">REST MEASURES</div>
+    <div class="feedstats">
+     <div class="fstat"><label>Requests sent</label><b id="restRequests">0</b></div>
+     <div class="fstat"><label>Successful responses</label><b id="restSuccess">0</b></div>
+     <div class="fstat"><label>Last request RTT</label><b id="restRTT">—</b></div>
+     <div class="fstat"><label>Average request RTT</label><b id="restAvg">—</b></div>
+     <div class="fstat"><label>Last response age</label><b id="restAge">—</b></div>
+     <div class="fstat"><label>Time to first change</label><b id="restFirstLatency">—</b></div>
+    </div>
+    <div id="restInfo" class="feedstatus">Waiting for REST response.</div>
+   </div>
+  </article>
+ </div>
+ <button id="stopRace">Stop &amp; Result</button>
+ <div id="raceResult" class="result hidden" aria-live="polite"></div>
+ <div class="note">Browser-observed timings only. REST polling may miss intermediate changes; connection status does not prove a price changed.</div>
 </section>
 
 <script>
-(() => {
-"use strict";
-
+(()=>{"use strict";
 const WORKER="https://crystal-live-odds.mbeta3996.workers.dev";
 const WS_URL="wss://ws-subscriptions-clob.polymarket.com/ws/market";
-const BOOK_URL="https://clob.polymarket.com/book?token_id=";
-const MATCH_REFRESH=60000,REST_INTERVAL=1000;
+const CLOB_BOOK="https://clob.polymarket.com/book?token_id=";
+const MATCH_REFRESH=60000,REST_INTERVAL=1500;
 const $=id=>document.getElementById(id);
-
 const S={
  sport:"all",filter:"all",search:"",matches:[],quotes:new Map(),
  ws:null,wsOK:false,wsGen:0,retry:0,reconnect:null,
- matchTimer:null,busy:false,packets:0,updates:0,lastPacket:0,
- packetTimes:[],fetchMs:0,renderMs:0,lastFetch:0,race:null
+ busy:false,packets:0,updates:0,lastPacket:0,packetTimes:[],
+ fetchMs:0,renderMs:0,lastFetch:0,race:null,
+ tokenNodes:new Map(),subscribed:new Set(),refreshTimer:null
 };
-
-function txt(id,v){
- const e=$(id);if(!e)return;
- v=String(v);
- if(e.textContent!==v)e.textContent=v;
-}
-function n(v){
- if(v===null||v===undefined||v==="")return null;
- const x=Number(v);return Number.isFinite(x)?x:null;
-}
+function txt(id,v){const e=$(id);if(e){v=String(v);if(e.textContent!==v)e.textContent=v}}
+function num(v){if(v===null||v===undefined||v==="")return null;const x=Number(v);return Number.isFinite(x)?x:null}
 function cents(p){return p==null?"—":`${Math.round(p*100)}¢`}
-function decimal(p){return p>0&&p<=1?(1/p).toFixed(2):"—"}
-function age(ms){
- if(ms==null||!Number.isFinite(ms)||ms<0)return "—";
- return ms<1000?`${Math.round(ms)} ms`:`${(ms/1000).toFixed(2)} s`;
+function dec(p){return p>0&&p<=1?(1/p).toFixed(2):"—"}
+function age(ms){return ms==null||!Number.isFinite(ms)||ms<0?"—":ms<1000?`${Math.round(ms)} ms`:`${(ms/1000).toFixed(2)} s`}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function sport(m){let s=String(m.sport||"").toLowerCase();return s==="soccer"?"football":s}
+function title(m){return String(m.title||m.marketQuestion||m.question||"Polymarket match")}
+function tokens(m){
+ let a=Array.isArray(m.tokens)?m.tokens:[];
+ if(a.length)return a.map(t=>({id:String(t.id||t.token_id||t.tokenId||""),name:String(t.name||t.outcome||"Outcome")})).filter(t=>t.id);
+ let ids=Array.isArray(m.clobTokenIds)?m.clobTokenIds:Array.isArray(m.tokenIds)?m.tokenIds:[];
+ let outs=Array.isArray(m.outcomes)?m.outcomes:[];
+ return ids.map((id,i)=>({id:String(id),name:String(outs[i]||`Outcome ${i+1}`)})).filter(t=>t.id);
 }
-function esc(s){
- return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-}
-function sport(m){
- const s=String(m.sport||"").toLowerCase();
- return s==="football"?"soccer":s;
-}
-function matchTitle(m){return String(m.title||m.marketQuestion||"Polymarket match")}
-function getTokens(m){
- if(Array.isArray(m.tokens)&&m.tokens.length)
-  return m.tokens.map(t=>({id:String(t.id||""),name:String(t.name||"Outcome")})).filter(t=>t.id);
- const ids=Array.isArray(m.clobTokenIds)?m.clobTokenIds:[];
- const outcomes=Array.isArray(m.outcomes)?m.outcomes:[];
- return ids.map((id,i)=>({id:String(id),name:String(outcomes[i]||`Outcome ${i+1}`)})).filter(t=>t.id);
-}
-function getQuote(id){
- return S.quotes.get(String(id))||{bid:null,ask:null,bidSize:null,askSize:null,at:0};
-}
+function quote(id){return S.quotes.get(String(id))||{bid:null,ask:null,bidSize:null,askSize:null,at:0}}
 function best(levels,side){
- const a=(Array.isArray(levels)?levels:[])
- .map(x=>({price:n(x.price),size:n(x.size)}))
+ const a=(Array.isArray(levels)?levels:[]).map(x=>({price:num(x.price),size:num(x.size)}))
  .filter(x=>x.price!==null&&x.price>0&&x.price<=1);
  a.sort((x,y)=>side==="bid"?y.price-x.price:x.price-y.price);
- return a[0]||{price:null,size:null};
+ return a[0]||{price:null,size:null}
 }
-function fromBook(book){
- const bid=best(book.bids,"bid"),ask=best(book.asks,"ask");
- return {bid:bid.price,ask:ask.price,bidSize:bid.size,askSize:ask.size,at:Date.now()};
-}
-function sig(q){return `${q.bid}|${q.ask}`}
-function isLive(m){
- if(m.live===true||String(m.status||"").toLowerCase()==="live")return true;
- const a=Date.parse(m.startDate||"");
- const b=Date.parse(m.endDate||"");
- return a>0&&a<=Date.now()&&(!b||b>=Date.now());
+function bookQuote(b){
+ const bid=best(b.bids,"bid"),ask=best(b.asks,"ask");
+ return {bid:bid.price,ask:ask.price,bidSize:bid.size,askSize:ask.size,at:Date.now()}
 }
 function dayKey(v){
  if(!v)return "";
  const d=new Date(v);if(Number.isNaN(d.getTime()))return "";
- const parts=new Intl.DateTimeFormat("en-CA",{
-  timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"
- }).formatToParts(d);
- const o={};parts.forEach(p=>o[p.type]=p.value);
- return `${o.year}-${o.month}-${o.day}`;
+ const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d);
+ const o={};p.forEach(x=>o[x.type]=x.value);return `${o.year}-${o.month}-${o.day}`
 }
-function dateKeyToday(delta=0){
- const d=new Date();
- const india=new Date(d.toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));
- india.setDate(india.getDate()+delta);
- return `${india.getFullYear()}-${String(india.getMonth()+1).padStart(2,"0")}-${String(india.getDate()).padStart(2,"0")}`;
+function todayKey(delta=0){
+ const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+ const o={};parts.forEach(x=>o[x.type]=x.value);
+ const d=new Date(Number(o.year),Number(o.month)-1,Number(o.day)+delta);
+ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`
 }
-function fmtTime(v){
- if(!v)return "Time unavailable";
- const d=new Date(v);return Number.isNaN(d.getTime())?"Time unavailable":
- d.toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+function timeLabel(v){
+ if(!v)return "Time unavailable";const d=new Date(v);
+ return Number.isNaN(d.getTime())?"Time unavailable":d.toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})
 }
-
-function updateQuote(id,q,source="push"){
- id=String(id||"");if(!id)return;
- const old=getQuote(id);
- const next={...old,...q,at:Date.now()};
- const changed=old.bid!==next.bid||old.ask!==next.ask;
- S.quotes.set(id,next);
- if(changed)S.updates++;
- updateQuoteDOM(id);
- const r=S.race;
- if(r&&r.active&&r.token===id&&source==="push")recordPush(next,changed);
+function live(m){
+ if(m.live===true||String(m.status||"").toLowerCase()==="live")return true;
+ const a=Date.parse(m.startDate||m.start_date||"");
+ const b=Date.parse(m.endDate||m.end_date||"");
+ return a>0&&a<=Date.now()&&(!b||b>=Date.now())
 }
-function updateQuoteDOM(id){
- const q=getQuote(id);
- document.querySelectorAll("[data-token]").forEach(el=>{
-  if(el.dataset.token!==String(id))return;
+function updateTokenNodes(id,q){
+ const nodes=S.tokenNodes.get(String(id));if(!nodes)return;
+ for(const el of nodes){
   const side=el.dataset.side,field=el.dataset.field;
-  let v="";
-  if(field==="price")v=cents(q[side]);
-  if(field==="decimal")v=`Decimal ${decimal(q[side])}`;
-  if(field==="size"){
-   const z=q[side==="bid"?"bidSize":"askSize"];
-   v=z==null?"":`Top level size: ${z}`;
-  }
-  if(field==="age")v=q.at?`Quote age ${age(Date.now()-q.at)}`:"Waiting for quote";
-  if(el.textContent!==v)el.textContent=v;
- });
- if(S.race&&S.race.token===String(id))paintPush(q);
+  let value="";
+  if(field==="price")value=cents(q[side]);
+  else if(field==="decimal")value=`Decimal ${dec(q[side])}`;
+  else if(field==="size"){const z=q[side==="bid"?"bidSize":"askSize"];value=z==null?"":`Top level size: ${z}`}
+  else if(field==="age")value=q.at?`Quote age ${age(Date.now()-q.at)}`:"Waiting for quote";
+  if(el.textContent!==value)el.textContent=value
+ }
 }
-function filteredMatches(){
+function registerNodes(root){
+ S.tokenNodes.clear();
+ root.querySelectorAll("[data-token]").forEach(el=>{
+  const id=el.dataset.token;if(!S.tokenNodes.has(id))S.tokenNodes.set(id,[]);
+  S.tokenNodes.get(id).push(el)
+ })
+}
+function updateQuote(id,patch,source="push"){
+ id=String(id||"");if(!id)return;
+ const old=quote(id),next={...old,...patch};
+ const changed=old.bid!==next.bid||old.ask!==next.ask;
+ if(patch.at===undefined)next.at=Date.now();
+ S.quotes.set(id,next);
+ if(changed){S.updates++;txt("updates",S.updates)}
+ updateTokenNodes(id,next);
+ if(S.race&&S.race.active&&S.race.token===id&&source==="push")recordPush(next,changed);
+}
+function filtered(){
  const q=S.search.trim().toLowerCase();
  return S.matches.filter(m=>{
   if(S.sport!=="all"&&sport(m)!==S.sport)return false;
-  if(S.filter==="live"&&!isLive(m))return false;
-  if(S.filter==="today"&&dayKey(m.startDate)!==dateKeyToday(0))return false;
-  if(S.filter==="tomorrow"&&dayKey(m.startDate)!==dateKeyToday(1))return false;
-  return !q||`${matchTitle(m)} ${m.slug||""} ${getTokens(m).map(t=>t.name).join(" ")}`.toLowerCase().includes(q);
- });
+  if(S.filter==="live"&&!live(m))return false;
+  const date=dayKey(m.startDate||m.start_date||m.date);
+  if(S.filter==="today"&&date!==todayKey(0)&&!live(m))return false;
+  if(S.filter==="tomorrow"&&date!==todayKey(1))return false;
+  return !q||`${title(m)} ${m.slug||""} ${tokens(m).map(t=>t.name).join(" ")}`.toLowerCase().includes(q)
+ })
 }
-function quoteHTML(id,side,label){
- const q=getQuote(id),p=q[side],z=q[side==="bid"?"bidSize":"askSize"];
- return `<div class="quote">
- <div class="qline"><span class="qlabel">${label}</span><span class="price" data-token="${esc(id)}" data-side="${side}" data-field="price">${cents(p)}</span></div>
- <div class="decimal" data-token="${esc(id)}" data-side="${side}" data-field="decimal">Decimal ${decimal(p)}</div>
- <div class="qsize" data-token="${esc(id)}" data-side="${side}" data-field="size">${z==null?"":`Top level size: ${z}`}</div>
- </div>`;
+function qhtml(id,side,label){
+ const q=quote(id),p=q[side],z=q[side==="bid"?"bidSize":"askSize"];
+ return `<div class="quote"><div class="qline"><span class="qlabel">${label}</span><span class="price" data-token="${esc(id)}" data-side="${side}" data-field="price">${cents(p)}</span></div><div class="decimal" data-token="${esc(id)}" data-side="${side}" data-field="decimal">Decimal ${dec(p)}</div><div class="qsize" data-token="${esc(id)}" data-side="${side}" data-field="size">${z==null?"":`Top level size: ${z}`}</div></div>`
 }
-function renderMatches(){
- const t0=performance.now();
- const list=filteredMatches();
+function render(){
+ const t=performance.now(),list=filtered(),root=$("matches");
  txt("matchCount",list.length);
- const root=$("matches");
  if(!list.length){
-  root.innerHTML=`<div class="empty">${S.matches.length?"No matches for this filter or search.":"No matches returned by Worker. Check the Worker endpoint."}</div>`;
-  S.renderMs=performance.now()-t0;txt("renderMs",`${S.renderMs.toFixed(1)} ms`);return;
+  root.innerHTML=`<div class="empty">${S.matches.length?"No matches for this filter or search.":"No matches returned by Worker. Check Worker health."}</div>`;
+  S.tokenNodes.clear();S.renderMs=performance.now()-t;txt("renderMs",`${S.renderMs.toFixed(1)} ms`);return
  }
  root.innerHTML=list.map((m,i)=>{
-  const ts=getTokens(m);
-  const a=ts[0]||{id:"",name:"Outcome A"},b=ts[1]||{id:"",name:"Outcome B"};
-  const status=isLive(m)?"LIVE":(m.status||"Scheduled");
-  return `<article class="card">
-   <div class="matchhead">
-    <div class="matchtitle">${esc(matchTitle(m))}</div>
-    <div class="meta"><span>${esc(String(sport(m)).toUpperCase())} · ${esc(status)}</span><span>${esc(fmtTime(m.startDate))}</span></div>
-   </div>
-   <div class="teams">
-    <div class="team"><div class="teamname">${esc(a.name)}</div>
-     ${a.id?quoteHTML(a.id,"ask","BACK · ASK")+quoteHTML(a.id,"bid","LAY · BID"):'<div class="small">Token unavailable</div>'}
-    </div>
-    <div class="team"><div class="teamname">${esc(b.name)}</div>
-     ${b.id?quoteHTML(b.id,"ask","BACK · ASK")+quoteHTML(b.id,"bid","LAY · BID"):'<div class="small">Token unavailable</div>'}
-    </div>
-   </div>
-   <div class="cardfoot"><span class="small">${ts.length} outcome token(s)</span><button data-race="${i}">Push vs Public</button></div>
-  </article>`;
+  const ts=tokens(m),a=ts[0]||{id:"",name:"Outcome A"},b=ts[1]||{id:"",name:"Outcome B"};
+  const status=live(m)?"LIVE":(m.status||"Scheduled");
+  return `<article class="card"><div class="matchhead"><div class="matchtitle">${esc(title(m))}</div><div class="meta"><span>${esc(sport(m).toUpperCase())} · ${esc(status)}</span><span>${esc(timeLabel(m.startDate||m.start_date))}</span></div></div><div class="teams"><div class="team"><div class="teamname">${esc(a.name)}</div>${a.id?qhtml(a.id,"ask","BACK · ASK")+qhtml(a.id,"bid","LAY · BID"):'<div class="small">Token unavailable</div>'}</div><div class="team"><div class="teamname">${esc(b.name)}</div>${b.id?qhtml(b.id,"ask","BACK · ASK")+qhtml(b.id,"bid","LAY · BID"):'<div class="small">Token unavailable</div>'}</div></div><div class="cardfoot"><span class="small">${ts.length} outcome token(s)</span><button data-race="${i}">Push vs Public</button></div></article>`
  }).join("");
- root.querySelectorAll("[data-race]").forEach(btn=>btn.addEventListener("click",()=>{
-  const m=list[Number(btn.dataset.race)];if(m)openRace(m);
- }));
- S.renderMs=performance.now()-t0;
- txt("renderMs",`${S.renderMs.toFixed(1)} ms`);
+ registerNodes(root);
+ root.querySelectorAll("[data-race]").forEach(b=>b.addEventListener("click",()=>{const m=list[Number(b.dataset.race)];if(m)openRace(m)}));
+ S.renderMs=performance.now()-t;txt("renderMs",`${S.renderMs.toFixed(1)} ms`)
 }
-
 function addPacket(){
  S.packets++;S.lastPacket=Date.now();S.packetTimes.push(S.lastPacket);
- S.packetTimes=S.packetTimes.filter(t=>Date.now()-t<10000);
- txt("packets",S.packets);
- txt("packetAge","0 ms");
+ while(S.packetTimes.length&&S.lastPacket-S.packetTimes[0]>10000)S.packetTimes.shift();
+ txt("packets",S.packets);txt("packetAge","0 ms");
  txt("pps",(S.packetTimes.length/10).toFixed(1));
- if(S.race&&S.race.active){
-  S.race.pushPackets++;
-  txt("pushPackets",S.race.pushPackets);
-  txt("pushAge","0 ms");
- }
+ if(S.race&&S.race.active){S.race.pushPackets++;txt("pushPackets",S.race.pushPackets);txt("pushAge","0 ms")}
 }
-function processWSMessage(raw){
- const started=performance.now();
- addPacket();
- let msg;
- try{msg=JSON.parse(raw)}catch{return}
- const events=Array.isArray(msg)?msg:[msg];
+function processMessage(raw){
+ const started=performance.now();addPacket();
+ let parsed;try{parsed=JSON.parse(raw)}catch{return}
+ const events=Array.isArray(parsed)?parsed:[parsed];
  for(const e of events){
   if(!e||typeof e!=="object")continue;
-  const eventType=String(e.event_type||e.type||"").toLowerCase();
-  if(eventType==="book"||Array.isArray(e.bids)||Array.isArray(e.asks)){
+  const type=String(e.event_type||e.type||"").toLowerCase();
+  if(type==="book"||Array.isArray(e.bids)||Array.isArray(e.asks)){
    const id=e.asset_id||e.assetId||e.token_id;
-   if(id)updateQuote(id,fromBook(e));
+   if(id)updateQuote(id,bookQuote(e))
   }
-  if(eventType==="best_bid_ask"||e.best_bid!==undefined||e.best_ask!==undefined){
+  if(type==="best_bid_ask"||e.best_bid!==undefined||e.best_ask!==undefined){
    const id=e.asset_id||e.assetId||e.token_id;
    if(id){
-    const old=getQuote(id);
-    const bid=n(e.best_bid),ask=n(e.best_ask);
-    updateQuote(id,{
-     bid:bid!==null?bid:old.bid,
-     ask:ask!==null?ask:old.ask,
-     bidSize:old.bidSize,askSize:old.askSize
-    });
+    const old=quote(id),bid=num(e.best_bid),ask=num(e.best_ask);
+    updateQuote(id,{bid:bid!==null?bid:old.bid,ask:ask!==null?ask:old.ask})
    }
   }
-  const changes=Array.isArray(e.price_changes)?e.price_changes:[];
-  for(const c of changes){
+  for(const c of Array.isArray(e.price_changes)?e.price_changes:[]){
    const id=c.asset_id||c.assetId;if(!id)continue;
-   const old=getQuote(id);
-   const bid=n(c.best_bid),ask=n(c.best_ask);
-   const side=String(c.side||"").toUpperCase();
-   const p=n(c.price);
-   updateQuote(id,{
-    bid:bid!==null?bid:old.bid,
-    ask:ask!==null?ask:old.ask,
-    bidSize:old.bidSize,askSize:old.askSize
-   });
-   if(bid===null&&ask===null&&p!==null){
-    if(side==="BUY"&&old.bid===null)updateQuote(id,{bid:p});
-    if(side==="SELL"&&old.ask===null)updateQuote(id,{ask:p});
-   }
-  }
-  if(eventType==="last_trade_price"&&e.asset_id){
-   const id=e.asset_id;
-   const r=S.race;
-   if(r&&r.active&&r.token===String(id)){
-    txt("pushInfo","Trade message received; best bid/ask may update separately.");
+   const old=quote(id),bid=num(c.best_bid),ask=num(c.best_ask);
+   if(bid!==null||ask!==null){
+    updateQuote(id,{bid:bid!==null?bid:old.bid,ask:ask!==null?ask:old.ask})
+   }else{
+    /* A trade/level change is not necessarily the best quote.
+       Do not invent a best bid or ask from c.price. */
+    updateQuote(id,{})
    }
   }
  }
- if(S.race&&S.race.active){
-  S.race.pushProcess=performance.now()-started;
-  txt("pushProcess",`${S.race.pushProcess.toFixed(2)} ms`);
- }
+ if(S.race&&S.race.active){S.race.pushProcess=performance.now()-started;txt("pushProcess",`${S.race.pushProcess.toFixed(2)} ms`)}
 }
+function allTokenIds(){return [...new Set(S.matches.flatMap(m=>tokens(m).map(t=>t.id)))]}
 function sendSubscriptions(ids){
  if(!S.ws||S.ws.readyState!==WebSocket.OPEN)return;
- const arr=[...new Set(ids.map(String).filter(Boolean))];
- for(let i=0;i<arr.length;i+=100){
-  S.ws.send(JSON.stringify({type:"market",assets_ids:arr.slice(i,i+100)}));
+ const fresh=[...new Set(ids.map(String).filter(Boolean))].filter(id=>!S.subscribed.has(id));
+ for(let i=0;i<fresh.length;i+=100){
+  const chunk=fresh.slice(i,i+100);
+  S.ws.send(JSON.stringify({type:"market",assets_ids:chunk}));
+  chunk.forEach(id=>S.subscribed.add(id))
  }
-}
-function allTokenIds(){
- return [...new Set(S.matches.flatMap(m=>getTokens(m).map(t=>t.id)))];
 }
 function connectWS(){
- if(S.ws&&[WebSocket.OPEN,WebSocket.CONNECTING].includes(S.ws.readyState))return;
+ if(S.ws&&(S.ws.readyState===WebSocket.OPEN||S.ws.readyState===WebSocket.CONNECTING))return;
  clearTimeout(S.reconnect);
- const gen=++S.wsGen;
- txt("wsState","Connecting");
- if(S.race)txt("pushState","Connecting");
- let ws;
- try{ws=new WebSocket(WS_URL)}catch(e){
-  txt("wsState","Connection error");scheduleWS();return;
- }
+ const gen=++S.wsGen;txt("wsState","Connecting");txt("pushState","Connecting…");
+ let ws;try{ws=new WebSocket(WS_URL)}catch{scheduleWS();return}
  S.ws=ws;
  ws.onopen=()=>{
   if(gen!==S.wsGen)return;
-  S.wsOK=true;S.retry=0;
-  txt("wsState","Connected");
-  if(S.race)txt("pushState","Connected · waiting for price change");
-  txt("pushConn","Connected");
-  txt("pushInfo","WebSocket connected. A price change is not required for connection health.");
+  S.wsOK=true;S.retry=0;S.subscribed.clear();
+  txt("wsState","Connected");txt("pushState","Connected · waiting for quote");txt("pushConn","Connected");
+  txt("pushInfo","Connected to public CLOB WebSocket.");
   sendSubscriptions(allTokenIds());
-  if(S.race&&S.race.active)sendSubscriptions([S.race.token]);
+  if(S.race&&S.race.active)sendSubscriptions([S.race.token])
  };
- ws.onmessage=ev=>{if(gen===S.wsGen)processWSMessage(ev.data)};
- ws.onerror=()=>{
-  if(gen===S.wsGen){
-   txt("wsState","Socket error");
-   if(S.race)txt("pushState","Socket error");
-  }
- };
+ ws.onmessage=e=>{if(gen===S.wsGen)processMessage(e.data)};
+ ws.onerror=()=>{if(gen===S.wsGen){txt("wsState","Socket error");txt("pushState","Socket error")}};
  ws.onclose=()=>{
   if(gen!==S.wsGen)return;
-  S.wsOK=false;txt("wsState","Disconnected");
-  if(S.race){txt("pushState","Disconnected");txt("pushConn","Disconnected");}
-  scheduleWS();
- };
+  S.wsOK=false;S.subscribed.clear();txt("wsState","Disconnected");
+  if(S.race){txt("pushState","Disconnected");txt("pushConn","Disconnected")}
+  scheduleWS()
+ }
 }
 function scheduleWS(){
- clearTimeout(S.reconnect);
- S.retry++;
- const delay=Math.min(15000,700*Math.pow(2,Math.min(S.retry,4)));
- S.reconnect=setTimeout(connectWS,delay);
+ clearTimeout(S.reconnect);S.retry++;
+ const delay=Math.min(15000,500*Math.pow(2,Math.min(S.retry,5)));
+ S.reconnect=setTimeout(connectWS,delay)
 }
 async function fetchJSON(url,timeout=12000){
  const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);
- try{
-  const res=await fetch(url,{signal:c.signal,cache:"no-store"});
-  if(!res.ok)throw new Error(`HTTP ${res.status}`);
-  return await res.json();
- }finally{clearTimeout(timer)}
+ try{const res=await fetch(url,{signal:c.signal,cache:"no-store"});if(!res.ok)throw new Error(`HTTP ${res.status}`);return await res.json()}
+ finally{clearTimeout(timer)}
+}
+function rowsFrom(json){
+ if(Array.isArray(json))return json;
+ for(const key of ["matches","data","results","events"])if(Array.isArray(json?.[key]))return json[key];
+ return []
 }
 async function fetchMatches(){
- if(S.busy)return;
- S.busy=true;
- const started=performance.now();
- txt("workerState","Fetching");
- txt("topStatus","Refreshing Polymarket match discovery…");
+ if(S.busy)return;S.busy=true;
+ const started=performance.now();txt("workerState","Fetching");txt("topStatus","Refreshing match discovery…");
  try{
   let all=[],seen=new Set(),offset=0,hasMore=true;
+  /* Worker receives only its supported sport names. Football is not sent as soccer. */
+  const requestedSport=S.sport==="all"?"all":S.sport;
   for(let page=0;page<15&&hasMore;page++){
-   const url=`${WORKER}/matches?offset=${offset}&sport=${encodeURIComponent(S.sport)}&limit=100`;
+   const url=`${WORKER}/matches?offset=${offset}&sport=${encodeURIComponent(requestedSport)}&limit=100&refresh=1`;
    const json=await fetchJSON(url);
    if(json.success===false)throw new Error(json.error||"Worker returned success:false");
-   const rows=Array.isArray(json.data)?json.data:
-              Array.isArray(json.matches)?json.matches:[];
+   const rows=rowsFrom(json);
    for(const m of rows){
-    const id=String(m.id||m.eventId||m.slug||matchTitle(m));
-    if(!seen.has(id)){seen.add(id);all.push(m);}
+    const key=String(m.id||m.eventId||m.slug||title(m));
+    if(!seen.has(key)){seen.add(key);all.push(m)}
    }
    hasMore=Boolean(json.hasMore);
    const next=Number(json.nextOffset);
    offset=Number.isFinite(next)&&next>offset?next:offset+rows.length;
-   if(!rows.length||rows.length<1)break;
-   if(!hasMore)break;
+   if(!rows.length||!hasMore)break
   }
-  S.matches=all;
-  S.lastFetch=Date.now();
-  S.fetchMs=performance.now()-started;
-  txt("workerState","OK");
-  txt("fetchTime",new Date(S.lastFetch).toLocaleTimeString());
+  S.matches=all;S.lastFetch=Date.now();S.fetchMs=performance.now()-started;
+  txt("workerState","OK");txt("fetchTime",new Date(S.lastFetch).toLocaleTimeString());
   txt("fetchMs",`${S.fetchMs.toFixed(0)} ms`);
-  txt("topStatus",`${all.length} matches loaded · Worker fetch ${S.fetchMs.toFixed(0)} ms`);
-  renderMatches();
-  txt("tokenCount",allTokenIds().length);
-  if(S.wsOK)sendSubscriptions(allTokenIds());
-  connectWS();
+  txt("topStatus",`${all.length} matches loaded · discovery ${S.fetchMs.toFixed(0)} ms`);
+  render();txt("tokenCount",allTokenIds().length);
+  if(S.wsOK)sendSubscriptions(allTokenIds());else connectWS()
  }catch(e){
-  S.fetchMs=performance.now()-started;
-  txt("workerState","ERROR");
-  txt("fetchMs",`${S.fetchMs.toFixed(0)} ms`);
+  S.fetchMs=performance.now()-started;txt("workerState","ERROR");txt("fetchMs",`${S.fetchMs.toFixed(0)} ms`);
   txt("topStatus",`Worker error: ${e.message}`);
-  if(!S.matches.length)$("matches").innerHTML=`<div class="empty">Could not load matches.<br>${esc(e.message)}<br><br>Check <a href="${WORKER}/health" target="_blank" rel="noopener">Worker health</a>.</div>`;
+  if(!S.matches.length)$("matches").innerHTML=`<div class="empty">Could not load matches.<br>${esc(e.message)}<br><br><a href="${WORKER}/health" target="_blank" rel="noopener">Check Worker health</a></div>`
  }finally{S.busy=false}
 }
-
-function setButtonGroup(root,attr,value){
- root.querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset[attr]===value));
-}
+function groupButtons(root,attr,value){root.querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset[attr]===value))}
 $("sports").addEventListener("click",e=>{
  const b=e.target.closest("button[data-sport]");if(!b)return;
- S.sport=b.dataset.sport;setButtonGroup($("sports"),"sport",S.sport);
- fetchMatches();
+ S.sport=b.dataset.sport;groupButtons($("sports"),"sport",S.sport);fetchMatches()
 });
 $("filters").addEventListener("click",e=>{
  const b=e.target.closest("button[data-filter]");if(!b)return;
- S.filter=b.dataset.filter;setButtonGroup($("filters"),"filter",S.filter);renderMatches();
+ S.filter=b.dataset.filter;groupButtons($("filters"),"filter",S.filter);render()
 });
-$("search").addEventListener("input",e=>{S.search=e.target.value;renderMatches()});
-$("refresh").addEventListener("click",()=>fetchMatches());
+$("search").addEventListener("input",e=>{S.search=e.target.value;render()});
+$("refresh").addEventListener("click",fetchMatches);
 
 function paintPush(q){
- txt("pushBid",cents(q.bid));txt("pushBidDec",`Decimal ${decimal(q.bid)}`);
- txt("pushAsk",cents(q.ask));txt("pushAskDec",`Decimal ${decimal(q.ask)}`);
+ txt("pushBid",cents(q.bid));txt("pushBidDec",`Decimal ${dec(q.bid)}`);
+ txt("pushAsk",cents(q.ask));txt("pushAskDec",`Decimal ${dec(q.ask)}`);
  txt("pushBidSize",q.bidSize==null?"":`Top level size: ${q.bidSize}`);
  txt("pushAskSize",q.askSize==null?"":`Top level size: ${q.askSize}`);
- txt("pushQuoteAge",q.at?age(Date.now()-q.at):"—");
+ txt("pushQuoteAge",q.at?age(Date.now()-q.at):"—")
 }
 function paintREST(q){
- txt("restBid",cents(q.bid));txt("restBidDec",`Decimal ${decimal(q.bid)}`);
- txt("restAsk",cents(q.ask));txt("restAskDec",`Decimal ${decimal(q.ask)}`);
+ txt("restBid",cents(q.bid));txt("restBidDec",`Decimal ${dec(q.bid)}`);
+ txt("restAsk",cents(q.ask));txt("restAskDec",`Decimal ${dec(q.ask)}`);
  txt("restBidSize",q.bidSize==null?"":`Top level size: ${q.bidSize}`);
- txt("restAskSize",q.askSize==null?"":`Top level size: ${q.askSize}`);
+ txt("restAskSize",q.askSize==null?"":`Top level size: ${q.askSize}`)
 }
 function recordPush(q,changed){
- const r=S.race;if(!r||!r.active)return;
- paintPush(q);
+ const r=S.race;if(!r||!r.active)return;paintPush(q);
  if(changed){
   r.pushChanges++;txt("pushChanges",r.pushChanges);
-  if(r.pushFirst===null){
-   r.pushFirst=performance.now()-r.started;
-   txt("pushFirst",`${r.pushFirst.toFixed(0)} ms after start`);
-   txt("pushFirstLatency",`${r.pushFirst.toFixed(0)} ms`);
-  }
-  txt("pushInfo","A best bid/ask change was observed via WebSocket.");
- }else if(S.wsOK){
-  txt("pushInfo","Connected; no new best bid/ask change observed yet.");
+  if(r.pushFirst===null){r.pushFirst=performance.now()-r.started;txt("pushFirst",`${r.pushFirst.toFixed(0)} ms after start`);txt("pushFirstLatency",`${r.pushFirst.toFixed(0)} ms`)}
+  txt("pushInfo","A best bid/ask change was observed via WebSocket.")
  }
 }
 async function pollREST(){
- const r=S.race;
- if(!r||!r.active||r.pollBusy)return;
- r.pollBusy=true;
- const started=performance.now();
- r.requests++;txt("restRequests",r.requests);
+ const r=S.race;if(!r||!r.active||r.pollBusy)return;
+ r.pollBusy=true;const started=performance.now();r.requests++;txt("restRequests",r.requests);
  try{
-  const book=await fetchJSON(BOOK_URL+encodeURIComponent(r.token),8000);
-  const elapsed=performance.now()-started;
+  const b=await fetchJSON(CLOB_BOOK+r.token,8000),elapsed=performance.now()-started;
   r.success++;r.rtts.push(elapsed);if(r.rtts.length>30)r.rtts.shift();
   txt("restSuccess",r.success);txt("restRTT",`${elapsed.toFixed(0)} ms`);
   txt("restAvg",`${(r.rtts.reduce((a,b)=>a+b,0)/r.rtts.length).toFixed(0)} ms`);
   r.lastResponse=Date.now();txt("restAge","0 ms");
-  const q=fromBook(book),old=r.restQuote;
-  const changed=old&&(old.bid!==q.bid||old.ask!==q.ask);
-  r.restQuote=q;paintREST(q);
-  txt("restState","Polling · response OK");
+  const q=bookQuote(b),old=r.restQuote,changed=old&&(old.bid!==q.bid||old.ask!==q.ask);
+  r.restQuote=q;paintREST(q);txt("restState","Polling · response OK");
   if(changed){
    r.restChanges++;txt("restChanges",r.restChanges);
-   if(r.restFirst===null){
-    r.restFirst=performance.now()-r.started;
-    txt("restFirst",`${r.restFirst.toFixed(0)} ms after start`);
-    txt("restFirstLatency",`${r.restFirst.toFixed(0)} ms`);
-   }
-   txt("restInfo","A changed quote was observed in a REST response.");
-  }else{
-   txt("restInfo","Request successful; no new best bid/ask change in this sample.");
-  }
- }catch(e){
-  txt("restState","Request error");
-  txt("restInfo",`${e.message}. REST polling will retry.`);
-  txt("restRTT",`${(performance.now()-started).toFixed(0)} ms`);
- }finally{
-  r.pollBusy=false;
-  if(r.active)r.restTimer=setTimeout(pollREST,REST_INTERVAL);
- }
+   if(r.restFirst===null){r.restFirst=performance.now()-r.started;txt("restFirst",`${r.restFirst.toFixed(0)} ms after start`);txt("restFirstLatency",`${r.restFirst.toFixed(0)} ms`)}
+   txt("restInfo","A changed quote was observed in a REST response.")
+  }else txt("restInfo","Request successful; no best bid/ask change in this sample.")
+ }catch(e){txt("restState","Request error");txt("restInfo",`${e.message}. Will retry.`);txt("restRTT",`${(performance.now()-started).toFixed(0)} ms`)}
+ finally{r.pollBusy=false;if(r.active)r.restTimer=setTimeout(pollREST,REST_INTERVAL)}
 }
 function openRace(m){
- const ts=getTokens(m);
- if(!ts.length){alert("No outcome token IDs found for this match.");return}
+ const ts=tokens(m);if(!ts.length){alert("No outcome token IDs found for this match.");return}
  closeRace(false);
- const sel=$("raceToken");
- sel.innerHTML=ts.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("");
- $("raceMatch").textContent=matchTitle(m);
- $("race").classList.remove("hidden");
- $("raceResult").classList.add("hidden");
- startRace(m,ts[0].id);
- sel.onchange=()=>startRace(m,sel.value);
+ $("raceToken").innerHTML=ts.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("");
+ $("raceMatch").textContent=title(m);$("race").classList.remove("hidden");$("raceResult").classList.add("hidden");
+ startRace(m,ts[0].id);$("raceToken").onchange=()=>startRace(m,$("raceToken").value)
 }
 function startRace(m,token){
- closeRace(false);
- const q=getQuote(token);
- const r={
-  active:true,match:m,token:String(token),started:performance.now(),
-  pushPackets:0,pushChanges:0,pushFirst:null,
-  requests:0,success:0,rtts:[],restQuote:null,
-  restChanges:0,restFirst:null,lastResponse:0,pollBusy:false,
-  restTimer:null,pushProcess:null
- };
- S.race=r;
- $("raceResult").classList.add("hidden");
+ closeRace(false);const q=quote(token);
+ S.race={active:true,match:m,token:String(token),started:performance.now(),pushPackets:0,pushChanges:0,pushFirst:null,requests:0,success:0,rtts:[],restQuote:null,restChanges:0,restFirst:null,lastResponse:0,pollBusy:false,restTimer:null,pushProcess:null};
+ const r=S.race;$("raceResult").classList.add("hidden");
  ["pushFirst","pushFirstLatency","restFirst","restFirstLatency"].forEach(id=>txt(id,"—"));
- txt("pushChanges","0");txt("restChanges","0");
- txt("pushPackets","0");txt("restRequests","0");txt("restSuccess","0");
- txt("restRTT","—");txt("restAvg","—");txt("restAge","—");
- txt("pushAge","—");txt("pushProcess","—");txt("pushQuoteAge","—");
- txt("pushBid","—");txt("pushAsk","—");txt("pushBidDec","Decimal —");txt("pushAskDec","Decimal —");
- txt("restBid","—");txt("restAsk","—");txt("restBidDec","Decimal —");txt("restAskDec","Decimal —");
- txt("pushConn",S.wsOK?"Connected":"Connecting");
- txt("pushState",S.wsOK?"Connected · waiting for price change":"Connecting…");
- txt("pushInfo",q.at?"Existing quote available; waiting for a new change.":"Waiting for first quote message.");
- txt("restState","Starting polling…");txt("restInfo","Waiting for first REST response.");
- if(q.at)paintPush(q);
- if(S.wsOK)sendSubscriptions([token]);else connectWS();
- pollREST();
+ ["pushChanges","restChanges","pushPackets","restRequests","restSuccess"].forEach(id=>txt(id,"0"));
+ ["restRTT","restAvg","restAge","pushAge","pushProcess","pushQuoteAge"].forEach(id=>txt(id,"—"));
+ ["pushBid","pushAsk","restBid","restAsk"].forEach(id=>txt(id,"—"));
+ ["pushBidDec","pushAskDec","restBidDec","restAskDec"].forEach(id=>txt(id,"Decimal —"));
+ txt("pushConn",S.wsOK?"Connected":"Connecting");txt("pushState",S.wsOK?"Connected · waiting for quote":"Connecting…");
+ txt("pushInfo",q.at?"Existing quote available; waiting for next update.":"Waiting for first quote message.");
+ txt("restState","Starting polling…");txt("restInfo","Waiting for REST response.");
+ if(q.at)paintPush(q);if(S.wsOK)sendSubscriptions([token]);else connectWS();pollREST()
 }
 function closeRace(hide=true){
- const r=S.race;
- if(r){
-  r.active=false;
-  clearTimeout(r.restTimer);
- }
- S.race=null;
- if(hide)$("race").classList.add("hidden");
+ if(S.race){S.race.active=false;clearTimeout(S.race.restTimer)}
+ S.race=null;if(hide)$("race").classList.add("hidden")
 }
 function stopRace(){
- const r=S.race;if(!r)return;
- r.active=false;clearTimeout(r.restTimer);
- const p=r.pushFirst,rest=r.restFirst;
- let summary="Inconclusive: no price change was observed on both feeds during this run.";
- if(p!==null&&rest!==null){
-  summary=p<rest?"Push observed a change first in this browser.":rest<p?"REST observed a change first in this browser.":"Both feeds observed a change at similar measured times.";
- }else if(p!==null){
-  summary="Push observed a change; REST did not observe one during this run.";
- }else if(rest!==null){
-  summary="REST observed a change; Push did not observe one during this run.";
- }
- $("raceResult").innerHTML=`<h3>Comparison result</h3>${esc(summary)}<br>
- Push first change: <b>${p===null?"Not observed":p.toFixed(0)+" ms"}</b><br>
- REST first change: <b>${rest===null?"Not observed":rest.toFixed(0)+" ms"}</b><br>
- Push packets: <b>${r.pushPackets}</b> · REST successful responses: <b>${r.success}</b><br>
- <span class="note">This compares changes observed by this browser, not exchange-side latency. REST polling may miss intermediate changes.</span>`;
- $("raceResult").classList.remove("hidden");
- txt("pushState",S.wsOK?"Connected · stopped":"Disconnected");
- txt("restState","Polling stopped");
- txt("pushInfo","Comparison stopped.");
- txt("restInfo","Comparison stopped.");
+ const r=S.race;if(!r)return;r.active=false;clearTimeout(r.restTimer);
+ const p=r.pushFirst,z=r.restFirst;
+ let summary="Inconclusive: no change was observed on both feeds.";
+ if(p!==null&&z!==null)summary=p<z?"Push observed a change first in this browser.":z<p?"REST observed a change first in this browser.":"Both feeds observed a change at similar times.";
+ else if(p!==null)summary="Push observed a change; REST did not observe one during this run.";
+ else if(z!==null)summary="REST observed a change; Push did not observe one during this run.";
+ $("raceResult").innerHTML=`<h3>Comparison result</h3>${esc(summary)}<br>Push first change: <b>${p===null?"Not observed":p.toFixed(0)+" ms"}</b><br>REST first change: <b>${z===null?"Not observed":z.toFixed(0)+" ms"}</b><br>Push packets: <b>${r.pushPackets}</b> · REST successful responses: <b>${r.success}</b><br><span class="note">Browser-observed timing, not exchange-side latency.</span>`;
+ $("raceResult").classList.remove("hidden");txt("pushState",S.wsOK?"Connected · stopped":"Disconnected");txt("restState","Polling stopped");txt("pushInfo","Comparison stopped.");txt("restInfo","Comparison stopped.")
 }
 $("closeRace").addEventListener("click",()=>closeRace(true));
 $("stopRace").addEventListener("click",stopRace);
 
 function heartbeat(){
- txt("packetAge",S.lastPacket?age(Date.now()-S.lastPacket):"No packets yet");
- txt("quoteAge",(()=>{
-  let newest=0;S.quotes.forEach(q=>newest=Math.max(newest,q.at||0));
-  return newest?age(Date.now()-newest):"No quotes yet";
- })());
+ const now=Date.now();
+ txt("packetAge",S.lastPacket?age(now-S.lastPacket):"No packets yet");
+ let newest=0;S.quotes.forEach(q=>{if(q.at>newest)newest=q.at});
+ txt("quoteAge",newest?age(now-newest):"No quotes yet");
+ txt("pps",(S.packetTimes.filter(t=>now-t<10000).length/10).toFixed(1));
  if(S.race&&S.race.active){
-  const r=S.race;
-  txt("pushAge",S.lastPacket?age(Date.now()-S.lastPacket):"No packets yet");
-  const q=getQuote(r.token);
-  txt("pushQuoteAge",q.at?age(Date.now()-q.at):"No quote yet");
-  if(r.lastResponse)txt("restAge",age(Date.now()-r.lastResponse));
+  const r=S.race,q=quote(r.token);
+  txt("pushAge",S.lastPacket?age(now-S.lastPacket):"No packets yet");
+  txt("pushQuoteAge",q.at?age(now-q.at):"No quote yet");
+  if(r.lastResponse)txt("restAge",age(now-r.lastResponse));
   txt("pushConn",S.wsOK?"Connected":"Disconnected");
-  if(S.wsOK&&r.pushFirst===null)txt("pushState","Connected · waiting for a change");
  }
- txt("pps",(S.packetTimes.filter(t=>Date.now()-t<10000).length/10).toFixed(1));
 }
-setInterval(heartbeat,250);
-setInterval(()=>{
- if(!S.busy)fetchMatches();
-},MATCH_REFRESH);
-
+setInterval(heartbeat,1000);
+setInterval(()=>{if(!S.busy)fetchMatches()},MATCH_REFRESH);
 fetchMatches();
 })();
 </script>
