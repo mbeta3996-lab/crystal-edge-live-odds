@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -60,21 +59,18 @@ dialog::backdrop{background:#0005}
 .modalbody{line-height:1.7;font-size:13px}
 .modalfoot{border-top:1px solid var(--line);display:flex;justify-content:flex-end}
 a{color:#111}
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.compare-card{border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0}
+.compare-name{font-weight:800;font-size:13px;margin-bottom:9px;overflow-wrap:anywhere}
+.compare-metric{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;overflow-wrap:anywhere}
+.compare-result{border:1px solid var(--line);border-radius:9px;padding:10px;margin-top:10px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.compare-title{font-weight:800;font-size:14px}
 @media(min-width:700px){#matches{grid-template-columns:repeat(2,minmax(0,1fr))}.statusgrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
-@media(max-width:380px){main{padding:9px}.statusgrid{gap:5px}.stat{padding:7px}.statvalue{font-size:11px}.price{font-size:14px}.outcomes{gap:6px;padding-left:7px;padding-right:7px}}
+@media(max-width:380px){main{padding:9px}.statusgrid{gap:5px}.stat{padding:7px}.statvalue{font-size:11px}.price{font-size:14px}.outcomes{gap:6px;padding-left:7px;padding-right:7px}.compare-card{padding:7px}}
 </style>
 </head>
 <body>
-<header>
- <div class="head">
-  <div>
-   <div class="brand">◇ CRYSTAL EDGE</div>
-   <div class="sub">POLYMARKET · LIVE SPORTS</div>
-  </div>
-  <button id="refresh">↻ Refresh</button>
- </div>
-</header>
-
+<header><div class="head"><div><div class="brand">◇ CRYSTAL EDGE</div><div class="sub">POLYMARKET · LIVE SPORTS</div></div><button id="refresh">↻ Refresh</button></div></header>
 <main>
  <div class="statusgrid">
   <div class="stat"><div class="statlabel">WEBSOCKET</div><div class="statvalue"><span id="wsDot" class="dot"></span><span id="wsStatus">Connecting</span></div></div>
@@ -82,545 +78,84 @@ a{color:#111}
   <div class="stat"><div class="statlabel">DISCOVERY</div><div class="statvalue" id="fetchMs">—</div></div>
   <div class="stat"><div class="statlabel">PACKETS / SEC</div><div class="statvalue" id="pps">0</div></div>
  </div>
-
- <div class="sports" id="sports">
-  <button class="active" data-sport="all" aria-label="All sports" title="All sports">◎</button>
-  <button data-sport="cricket" aria-label="Cricket" title="Cricket">🏏</button>
-  <button data-sport="tennis" aria-label="Tennis" title="Tennis">🎾</button>
-  <button data-sport="football" aria-label="Football" title="Football">⚽</button>
- </div>
-
- <div class="filters" id="filters">
-  <button class="active" data-filter="all">All matches</button>
-  <button data-filter="live">● Live</button>
-  <button data-filter="today">Today</button>
-  <button data-filter="tomorrow">Tomorrow</button>
- </div>
-
- <div class="toolbar">
-  <input id="search" type="search" placeholder="Search team, match or competition…" autocomplete="off">
-  <button id="clearSearch" aria-label="Clear search">×</button>
- </div>
-
- <div class="summary">
-  <span id="summary">Loading Polymarket matches…</span>
-  <span id="lastUpdate">Not updated</span>
- </div>
-
+ <div class="sports" id="sports"><button class="active" data-sport="all" aria-label="All sports" title="All sports">◎</button><button data-sport="cricket" aria-label="Cricket" title="Cricket">🏏</button><button data-sport="tennis" aria-label="Tennis" title="Tennis">🎾</button><button data-sport="football" aria-label="Football" title="Football">⚽</button></div>
+ <div class="filters" id="filters"><button class="active" data-filter="all">All matches</button><button data-filter="live">● Live</button><button data-filter="today">Today</button><button data-filter="tomorrow">Tomorrow</button></div>
+ <div class="toolbar"><input id="search" type="search" placeholder="Search team, match or competition…" autocomplete="off"><button id="clearSearch" aria-label="Clear search">×</button></div>
+ <div class="summary"><span id="summary">Loading Polymarket matches…</span><span id="lastUpdate">Not updated</span></div>
  <div id="matches"><div class="empty">Loading matches from Worker…</div></div>
-
- <footer>
-  Prices are public Polymarket CLOB quotes, not predictions.<br>
-  BACK uses best ask · LAY uses best bid · Missing quotes stay blank.<br>
-  <span id="sourceStatus">Waiting for Worker response</span><br>
-  <span id="sourceAge">Source timestamp: —</span>
- </footer>
+ <footer>Prices are public Polymarket CLOB quotes, not predictions.<br>BACK uses best ask · LAY uses best bid · Missing quotes stay blank.<br><span id="sourceStatus">Waiting for Worker response</span><br><span id="sourceAge">Source timestamp: —</span></footer>
 </main>
-
-<dialog id="marketDialog">
- <div class="modalhead" id="modalTitle">Available markets</div>
- <div class="modalbody" id="modalBody"></div>
- <div class="modalfoot"><button id="closeDialog">Close</button></div>
+<dialog id="marketDialog"><div class="modalhead" id="modalTitle">Available markets</div><div class="modalbody" id="modalBody"></div><div class="modalfoot"><button id="closeDialog">Close</button></div></dialog>
+<dialog id="compareDialog">
+ <div class="modalhead"><div class="compare-title" id="compareTitle">Live comparison</div><div class="compare-metric">Direct public Polymarket CLOB WebSocket · Live updates</div></div>
+ <div class="modalbody"><div class="compare-grid">
+  <div class="compare-card"><div class="compare-name" id="compareNameA">Outcome A</div><div id="compareQuoteA">Waiting for quote…</div><div class="compare-metric" id="compareMetaA">Quote age: —</div></div>
+  <div class="compare-card"><div class="compare-name" id="compareNameB">Outcome B</div><div id="compareQuoteB">Waiting for quote…</div><div class="compare-metric" id="compareMetaB">Quote age: —</div></div>
+ </div><div class="compare-result" id="compareTelemetry">Waiting for genuine WebSocket quote packets…</div><div class="compare-result" id="compareWinner">Update comparison will appear when quote updates arrive.</div></div>
+ <div class="modalfoot"><button id="closeCompare">Close</button></div>
 </dialog>
-
 <script>
 "use strict";
-
-const WORKER = "https://crystal-live-odds.mbeta3996.workers.dev";
-const WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
-const SPORTS = ["cricket","tennis","football"];
-const AUTO_REFRESH_MS = 60000;
-const FETCH_TIMEOUT_MS = 30000;
-const PAGE_SIZE = 100;
-
-const $ = id => document.getElementById(id);
-
-const S = {
- sport:"all",
- filter:"all",
- search:"",
- matches:[],
- busy:false,
- ws:null,
- wsOK:false,
- reconnectTimer:null,
- reconnectDelay:1000,
- packetTimes:[],
- packetCount:0,
- tokenIds:[],
- subscribed:new Set(),
- quotes:new Map(),
- lastPacket:0,
- lastSourceTimestamp:null,
- fetchMs:0,
- lastFetch:0,
- requestErrors:[],
- wsGeneration:0
-};
-
+const WORKER="https://crystal-live-odds.mbeta3996.workers.dev";
+const WS_URL="wss://ws-subscriptions-clob.polymarket.com/ws/market";
+const SPORTS=["cricket","tennis","football"];
+const AUTO_REFRESH_MS=60000,FETCH_TIMEOUT_MS=30000,PAGE_SIZE=100;
+const $=id=>document.getElementById(id);
+const S={sport:"all",filter:"all",search:"",matches:[],busy:false,ws:null,wsOK:false,reconnectTimer:null,reconnectDelay:1000,packetTimes:[],packetCount:0,tokenIds:[],subscribed:new Set(),quotes:new Map(),lastPacket:0,lastSourceTimestamp:null,fetchMs:0,lastFetch:0,requestErrors:[],wsGeneration:0,lastRenderMs:null,currentPacketPerf:0};
 function setText(id,value){$(id).textContent=String(value)}
-function esc(value){
- return String(value??"").replace(/[&<>"']/g,c=>({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
- }[c]));
-}
+function esc(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function title(m){return String(m.title||m.marketQuestion||m.question||m.slug||"Untitled match")}
 function matchId(m){return String(m.id||m.eventId||m.slug||title(m))}
-function matchDate(m){
- const fromKey=String(m.dateKey||"").slice(0,10);
- if(/^\d{4}-\d{2}-\d{2}$/.test(fromKey))return fromKey;
- const slug=String(m.slug||"").match(/(\d{4}-\d{2}-\d{2})/);
- if(slug)return slug[1];
- return "";
-}
-function todayKey(offset=0){
- const d=new Date();
- const parts=new Intl.DateTimeFormat("en-CA",{
-  timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"
- }).formatToParts(d);
- const obj={};
- for(const p of parts)obj[p.type]=p.value;
- const date=new Date(Date.UTC(Number(obj.year),Number(obj.month)-1,Number(obj.day)+offset));
- return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,"0")}-${String(date.getUTCDate()).padStart(2,"0")}`;
-}
-function formatDate(key){
- if(!key)return "Date unavailable";
- const d=new Date(key+"T12:00:00Z");
- return Number.isNaN(d.getTime())?key:d.toLocaleDateString("en-IN",{
-  day:"numeric",month:"short",timeZone:"Asia/Kolkata"
- });
-}
-function sport(m){
- const v=String(m.sport||"").toLowerCase();
- return v==="soccer"?"football":v;
-}
-function tokens(m){
- if(Array.isArray(m.tokens)&&m.tokens.length){
-  return m.tokens.map((t,i)=>({
-   id:String(t.id||t.token_id||m.clobTokenIds?.[i]||""),
-   name:String(t.name||t.outcome||m.outcomes?.[i]||`Outcome ${i+1}`)
-  })).filter(t=>t.id);
- }
- const ids=Array.isArray(m.clobTokenIds)?m.clobTokenIds:
-  Array.isArray(m.tokenIds)?m.tokenIds:[];
- const names=Array.isArray(m.outcomes)?m.outcomes:[];
- return ids.map((id,i)=>({id:String(id),name:String(names[i]||`Outcome ${i+1}`)})).filter(t=>t.id);
-}
-function isLive(m){
- if(typeof m.live==="boolean")return m.live;
- const status=String(m.status||"").toLowerCase();
- return ["live","in-play","in play","in_progress","in progress"].includes(status);
-}
-function rowsFrom(json){
- if(Array.isArray(json))return json;
- for(const key of ["data","matches","results","events"]){
-  if(Array.isArray(json?.[key]))return json[key];
- }
- return [];
-}
-async function fetchJSON(url,timeout=FETCH_TIMEOUT_MS){
- const controller=new AbortController();
- const timer=setTimeout(()=>controller.abort(),timeout);
- try{
-  const res=await fetch(url,{signal:controller.signal,cache:"no-store"});
-  if(!res.ok)throw new Error(`HTTP ${res.status} — ${new URL(url).pathname}`);
-  const json=await res.json();
-  if(json?.success===false)throw new Error(json.error||"Worker returned success:false");
-  return json;
- }catch(e){
-  if(e.name==="AbortError")throw new Error(`Request timed out after ${Math.round(timeout/1000)} seconds`);
-  throw e;
- }finally{
-  clearTimeout(timer);
- }
-}
-function endpointFor(sportName,filter,offset){
- let params=new URLSearchParams({sport:sportName,limit:String(PAGE_SIZE),offset:String(offset)});
- if(filter==="today")params.set("day","today");
- else if(filter==="tomorrow")params.set("day","tomorrow");
- else if(filter==="live")params.set("live","true");
- return `${WORKER}/matches?${params.toString()}`;
-}
-async function loadOne(sportName,filter){
- const collected=[];
- const seen=new Set();
- let offset=0;
- for(let page=0;page<4;page++){
-  const json=await fetchJSON(endpointFor(sportName,filter,offset));
-  const rows=rowsFrom(json);
-  for(const m of rows){
-   const id=matchId(m);
-   if(!seen.has(id)){seen.add(id);collected.push(m)}
-  }
-  if(!json.hasMore||!rows.length)break;
-  const next=Number(json.nextOffset);
-  offset=Number.isFinite(next)&&next>offset?next:offset+rows.length;
- }
- return collected;
-}
-function tasksForSelection(){
- const filters=S.filter==="all"?["today","tomorrow","live"]:[S.filter];
- const sports=S.sport==="all"?SPORTS:[S.sport];
- return sports.flatMap(sp=>filters.map(f=>({sport:sp,filter:f})));
-}
-async function fetchMatches(){
- if(S.busy)return;
- S.busy=true;
- $("refresh").disabled=true;
- setText("sourceStatus","Fetching matches from Worker…");
- const started=performance.now();
- const tasks=tasksForSelection();
- const settled=await Promise.allSettled(tasks.map(t=>loadOne(t.sport,t.filter)));
- const all=[];
- const seen=new Set();
- const errors=[];
- for(let i=0;i<settled.length;i++){
-  const result=settled[i];
-  if(result.status==="rejected"){
-   errors.push(`${tasks[i].sport}/${tasks[i].filter}: ${result.reason?.message||"request failed"}`);
-   continue;
-  }
-  for(const m of result.value){
-   const id=matchId(m);
-   if(!seen.has(id)){seen.add(id);all.push(m)}
-  }
- }
- S.fetchMs=performance.now()-started;
- S.lastFetch=Date.now();
- S.requestErrors=errors;
-
- // Preserve previously loaded matches if every new request failed.
- if(all.length){
-  S.matches=all;
- }else if(!S.matches.length){
-  $("matches").innerHTML=`<div class="empty error">No matches could be loaded.<br><br>${errors.map(esc).join("<br>")||"The Worker returned no matches."}<br><br><a href="${WORKER}/health" target="_blank" rel="noopener">Check Worker health</a></div>`;
- }
- setText("fetchMs",`${Math.round(S.fetchMs)} ms`);
- setText("lastUpdate",new Date(S.lastFetch).toLocaleTimeString());
- setText("sourceStatus",errors.length?`${errors.length} request(s) failed; successful results retained.`:"Worker requests completed");
- render();
- updateTokenSubscriptions();
- $("refresh").disabled=false;
- S.busy=false;
-}
-function filtered(){
- const q=S.search.trim().toLowerCase();
- return S.matches.filter(m=>{
-  if(S.sport!=="all"&&sport(m)!==S.sport)return false;
-  if(S.filter==="live"&&!isLive(m))return false;
-  const date=matchDate(m);
-  if(S.filter==="today"&&date!==todayKey(0))return false;
-  if(S.filter==="tomorrow"&&date!==todayKey(1))return false;
-  const searchText=[
-   title(m),m.slug||"",m.sport||"",
-   ...tokens(m).map(t=>t.name)
-  ].join(" ").toLowerCase();
-  return !q||searchText.includes(q);
- });
-}
-function quoteFor(id){
- return S.quotes.get(String(id))||{bid:null,ask:null,bidSize:null,askSize:null,ts:null};
-}
-function fmtPrice(p){
- if(p===null||p===undefined||!Number.isFinite(Number(p)))return "—";
- return `${Math.round(Number(p)*100)}¢`;
-}
-function fmtDecimal(p){
- const n=Number(p);
- if(p===null||p===undefined||!Number.isFinite(n)||n<=0)return "—";
- return (1/n).toFixed(2);
-}
-function fmtSize(n){
- if(n===null||n===undefined||!Number.isFinite(Number(n)))return "";
- return `Size ${Number(n).toLocaleString("en-IN",{maximumFractionDigits:2})}`;
-}
-function quoteBox(label,price,size){
- if(price===null||price===undefined||!Number.isFinite(Number(price))||Number(price)<=0){
-  return `<div class="quote"><div class="qlabel">${label}</div><div class="noquote">—</div><div class="decimal">No quote</div></div>`;
- }
- return `<div class="quote"><div class="qlabel">${label}</div><div class="price">${fmtPrice(price)}</div><div class="decimal">Decimal ${fmtDecimal(price)}</div><div class="size">${esc(fmtSize(size))}</div></div>`;
-}
-function marketButton(m){
- return `<button class="smallbtn" data-market="${esc(matchId(m))}">Markets ↗</button>`;
-}
-function render(){
- const list=filtered();
- setText("counts",`${list.length} / ${new Set(list.flatMap(tokens).map(t=>t.id)).size}`);
- setText("summary",`${list.length} match${list.length===1?"":"es"} · ${S.filter==="all"?"Live + Today + Tomorrow":S.filter}`);
- if(!list.length){
-  $("matches").innerHTML=`<div class="empty">No matching fixtures found for these filters.<br><br>Try another sport or date, or tap Refresh.</div>`;
-  return;
- }
- $("matches").innerHTML=list.map(m=>{
-  const ts=tokens(m);
-  const eventUrl=String(m.eventUrl||m.marketUrl||"");
-  const date=matchDate(m);
-  const dateText=date?formatDate(date):"Date unavailable";
-  const stateLabel=isLive(m)?"LIVE":date===todayKey(0)?"TODAY":date===todayKey(1)?"TOMORROW":"POLYMARKET";
-  const outcomes=ts.slice(0,2).map(t=>{
-   const q=quoteFor(t.id);
-   return `<div class="outcome">
-    <div class="team">${esc(t.name)}</div>
-    <div class="quotegrid">
-     ${quoteBox("BACK · Best ask",q.ask,q.askSize)}
-     ${quoteBox("LAY · Best bid",q.bid,q.bidSize)}
-    </div>
-   </div>`;
-  }).join("");
-  return `<article class="match" data-match="${esc(matchId(m))}">
-   <div class="matchhead">
-    <div><div class="matchtitle">${esc(title(m))}</div>
-     <div class="matchmeta">${esc(dateText)} · ${esc(String(m.sport||"").toUpperCase())}<br>${ts.length} outcome token${ts.length===1?"":"s"} · Market data from Polymarket</div>
-    </div>
-    <span class="tag">${stateLabel}</span>
-   </div>
-   <div class="outcomes">${outcomes||'<div class="noquote">No outcome tokens supplied by Worker.</div>'}</div>
-   <div class="matchfoot">
-    <span class="footnote">Quotes update when CLOB packets arrive.</span>
-    <div style="display:flex;gap:6px;flex-shrink:0">
-     ${marketButton(m)}
-     ${eventUrl?`<a class="smallbtn" style="display:inline-block;border:1px solid var(--line);border-radius:9px;padding:7px 9px;text-decoration:none" href="${esc(eventUrl)}" target="_blank" rel="noopener">Open ↗</a>`:""}
-    </div>
-   </div>
-  </article>`;
- }).join("");
-}
-function updateButtons(container,attribute,value){
- container.querySelectorAll("button").forEach(b=>{
-  b.classList.toggle("active",b.dataset[attribute]===value);
- });
-}
-$("sports").addEventListener("click",e=>{
- const b=e.target.closest("button[data-sport]");
- if(!b)return;
- S.sport=b.dataset.sport;
- updateButtons($("sports"),"sport",S.sport);
- fetchMatches();
-});
-$("filters").addEventListener("click",e=>{
- const b=e.target.closest("button[data-filter]");
- if(!b)return;
- S.filter=b.dataset.filter;
- updateButtons($("filters"),"filter",S.filter);
- fetchMatches();
-});
-$("search").addEventListener("input",e=>{
- S.search=e.target.value;
- render();
-});
-$("clearSearch").addEventListener("click",()=>{
- $("search").value="";
- S.search="";
- render();
-});
-$("refresh").addEventListener("click",fetchMatches);
-$("closeDialog").addEventListener("click",()=>$("marketDialog").close());
-$("matches").addEventListener("click",e=>{
- const b=e.target.closest("button[data-market]");
- if(!b)return;
- const m=S.matches.find(x=>matchId(x)===b.dataset.market);
- if(!m)return;
- setText("modalTitle",title(m));
- const fancy=Array.isArray(m.fancyMarkets)?m.fancyMarkets:[];
- const winnerUrl=m.marketUrl||m.eventUrl||"";
- const categories=[];
- if(winnerUrl||m.marketId){
-  categories.push(`<div><strong>Match Winner</strong><br><a href="${esc(winnerUrl||m.eventUrl||"#")}" target="_blank" rel="noopener">Open actual Polymarket market ↗</a></div>`);
- }
- for(const f of fancy){
-  const name=f.title||f.question||f.name;
-  const url=f.marketUrl||f.url;
-  if(name&&url)categories.push(`<div><strong>${esc(name)}</strong><br><a href="${esc(url)}" target="_blank" rel="noopener">Open market ↗</a></div>`);
- }
- $("modalBody").innerHTML=categories.length?categories.join("<hr style='border:0;border-top:1px solid var(--line);margin:12px 0'>"):"Worker did not supply additional market categories for this fixture. No unavailable categories are invented.";
- $("marketDialog").showModal();
-});
-
-// CLOB WebSocket: quote fields remain blank until genuine quote packets arrive.
-function numOrNull(v){
- if(v===null||v===undefined||v==="")return null;
- const n=Number(v);
- return Number.isFinite(n)?n:null;
-}
-function ensureQuote(id){
- id=String(id);
- if(!S.quotes.has(id))S.quotes.set(id,{bid:null,ask:null,bidSize:null,askSize:null,ts:null});
- return S.quotes.get(id);
-}
-function bestLevel(levels,side){
- if(!Array.isArray(levels)||!levels.length)return null;
- const parsed=levels.map(x=>({price:numOrNull(x.price),size:numOrNull(x.size)}))
-  .filter(x=>x.price!==null);
- if(!parsed.length)return null;
- parsed.sort((a,b)=>side==="bid"?b.price-a.price:a.price-b.price);
- return parsed[0];
-}
-function sourceTimestamp(data){
- const v=data?.timestamp??data?.ts??data?.timestamp_ms;
- if(v===undefined||v===null)return null;
- let n=Number(v);
- if(!Number.isFinite(n))return null;
- if(n<1e12)n*=1000;
- return n;
-}
-function recordPacket(data){
- const now=Date.now();
- S.packetCount++;
- S.packetTimes.push(now);
- S.packetTimes=S.packetTimes.filter(t=>now-t<=10000);
- S.lastPacket=now;
- const ts=sourceTimestamp(data);
- if(ts!==null)S.lastSourceTimestamp=ts;
- setText("pps",(S.packetTimes.length/10).toFixed(1));
- setText("sourceAge",S.lastSourceTimestamp?`Source timestamp age: ${Math.max(0,Date.now()-S.lastSourceTimestamp)} ms`:"Source timestamp: not provided");
-}
-function applyBook(data){
- const id=String(data.asset_id||data.assetId||data.token_id||"");
- if(!id)return;
- const bid=bestLevel(data.bids,"bid");
- const ask=bestLevel(data.asks,"ask");
- const q=ensureQuote(id);
- q.bid=bid?bid.price:null;
- q.bidSize=bid?bid.size:null;
- q.ask=ask?ask.price:null;
- q.askSize=ask?ask.size:null;
- q.ts=sourceTimestamp(data)||Date.now();
-}
-function applyBestBidAsk(data){
- const id=String(data.asset_id||data.assetId||data.token_id||"");
- if(!id)return;
- const q=ensureQuote(id);
- const bid=numOrNull(data.best_bid??data.bestBid);
- const ask=numOrNull(data.best_ask??data.bestAsk);
- if(bid!==null)q.bid=bid;
- if(ask!==null)q.ask=ask;
- q.ts=sourceTimestamp(data)||Date.now();
-}
-function applyPriceChanges(data){
- const changes=data.price_changes||data.changes;
- if(!Array.isArray(changes))return;
- for(const c of changes){
-  const id=String(c.asset_id||c.assetId||"");
-  if(!id)continue;
-  const q=ensureQuote(id);
-  const price=numOrNull(c.price);
-  const size=numOrNull(c.size);
-  const side=String(c.side||"").toUpperCase();
-  // A price_change is a level update, not necessarily the best level.
-  // Do not pretend it is the best quote. Wait for best_bid_ask/book.
-  if(side==="BUY"||side==="BID"){
-   if(price!==null&&size===0&&q.bid===price){q.bid=null;q.bidSize=null}
-  }else if(side==="SELL"||side==="ASK"){
-   if(price!==null&&size===0&&q.ask===price){q.ask=null;q.askSize=null}
-  }
-  q.ts=sourceTimestamp(data)||Date.now();
- }
-}
-function handleMessage(raw){
- let parsed;
- try{parsed=JSON.parse(raw)}catch{return}
- const messages=Array.isArray(parsed)?parsed:[parsed];
- let changed=false;
- for(const data of messages){
-  if(!data||typeof data!=="object")continue;
-  recordPacket(data);
-  const type=String(data.event_type||data.type||"").toLowerCase();
-  if(type==="book"){
-   applyBook(data);changed=true;
-  }else if(type==="best_bid_ask"||type==="best-bid-ask"){
-   applyBestBidAsk(data);changed=true;
-  }else if(type==="price_change"||type==="price-change"){
-   applyPriceChanges(data);changed=true;
-  }else if(type==="market"){
-   if(data.asset_id||data.bids||data.asks){applyBook(data);changed=true}
-  }
- }
- if(changed)render();
-}
-function connectWS(){
- if(S.ws&&(S.ws.readyState===WebSocket.OPEN||S.ws.readyState===WebSocket.CONNECTING))return;
- clearTimeout(S.reconnectTimer);
- const generation=++S.wsGeneration;
- setText("wsStatus","Connecting");
- $("wsDot").className="dot";
- let ws;
- try{ws=new WebSocket(WS_URL)}catch(e){
-  setText("wsStatus","Error");
-  $("wsDot").className="dot bad";
-  scheduleReconnect();
-  return;
- }
- S.ws=ws;
- ws.onopen=()=>{
-  if(generation!==S.wsGeneration)return;
-  S.wsOK=true;
-  S.reconnectDelay=1000;
-  S.subscribed.clear();
-  setText("wsStatus","Connected");
-  $("wsDot").className="dot good";
-  updateTokenSubscriptions();
- };
- ws.onmessage=e=>handleMessage(e.data);
- ws.onerror=()=>{
-  if(generation!==S.wsGeneration)return;
-  setText("wsStatus","Connection error");
-  $("wsDot").className="dot bad";
- };
- ws.onclose=()=>{
-  if(generation!==S.wsGeneration)return;
-  S.wsOK=false;
-  S.subscribed.clear();
-  setText("wsStatus","Disconnected");
-  $("wsDot").className="dot bad";
-  scheduleReconnect();
- };
-}
-function scheduleReconnect(){
- clearTimeout(S.reconnectTimer);
- const wait=S.reconnectDelay;
- S.reconnectDelay=Math.min(30000,S.reconnectDelay*2);
- S.reconnectTimer=setTimeout(connectWS,wait);
-}
-function allTokenIds(){
- return [...new Set(S.matches.flatMap(tokens).map(t=>String(t.id)).filter(Boolean))];
-}
-function updateTokenSubscriptions(){
- const ids=allTokenIds();
- S.tokenIds=ids;
- setText("counts",`${filtered().length} / ${ids.length}`);
- if(!S.ws||S.ws.readyState!==WebSocket.OPEN)return;
- // CLOB market subscriptions are sent in chunks to keep messages manageable.
- for(let i=0;i<ids.length;i+=100){
-  const chunk=ids.slice(i,i+100);
-  const key=chunk.join(",");
-  if(S.subscribed.has(key))continue;
-  try{
-   S.ws.send(JSON.stringify({type:"market",assets_ids:chunk}));
-   S.subscribed.add(key);
-  }catch(e){
-   setText("wsStatus","Subscribe error");
-   $("wsDot").className="dot bad";
-  }
- }
-}
-setInterval(()=>{
- const now=Date.now();
- S.packetTimes=S.packetTimes.filter(t=>now-t<=10000);
- setText("pps",(S.packetTimes.length/10).toFixed(1));
- if(S.lastPacket&&now-S.lastPacket>30000&&S.wsOK){
-  setText("wsStatus","Connected · quiet");
- }
- if(S.lastSourceTimestamp){
-  setText("sourceAge",`Source timestamp age: ${Math.max(0,now-S.lastSourceTimestamp)} ms`);
- }
-},1000);
-
-setInterval(()=>{
- if(!S.busy)fetchMatches();
-},AUTO_REFRESH_MS);
-
-connectWS();
-fetchMatches();
+function matchDate(m){const fromKey=String(m.dateKey||"").slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(fromKey))return fromKey;const slug=String(m.slug||"").match(/(\d{4}-\d{2}-\d{2})/);if(slug)return slug[1];return ""}
+function todayKey(offset=0){const d=new Date();const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d);const obj={};for(const p of parts)obj[p.type]=p.value;const date=new Date(Date.UTC(Number(obj.year),Number(obj.month)-1,Number(obj.day)+offset));return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,"0")}-${String(date.getUTCDate()).padStart(2,"0")}`}
+function formatDate(key){if(!key)return "Date unavailable";const d=new Date(key+"T12:00:00Z");return Number.isNaN(d.getTime())?key:d.toLocaleDateString("en-IN",{day:"numeric",month:"short",timeZone:"Asia/Kolkata"})}
+function sport(m){const v=String(m.sport||"").toLowerCase();return v==="soccer"?"football":v}
+function tokens(m){if(Array.isArray(m.tokens)&&m.tokens.length){return m.tokens.map((t,i)=>({id:String(t.id||t.token_id||m.clobTokenIds?.[i]||""),name:String(t.name||t.outcome||m.outcomes?.[i]||`Outcome ${i+1}`)})).filter(t=>t.id)}const ids=Array.isArray(m.clobTokenIds)?m.clobTokenIds:Array.isArray(m.tokenIds)?m.tokenIds:[];const names=Array.isArray(m.outcomes)?m.outcomes:[];return ids.map((id,i)=>({id:String(id),name:String(names[i]||`Outcome ${i+1}`)})).filter(t=>t.id)}
+function isLive(m){if(typeof m.live==="boolean")return m.live;const status=String(m.status||"").toLowerCase();return ["live","in-play","in play","in_progress","in progress"].includes(status)}
+function rowsFrom(json){if(Array.isArray(json))return json;for(const key of ["data","matches","results","events"]){if(Array.isArray(json?.[key]))return json[key]}return []}
+async function fetchJSON(url,timeout=FETCH_TIMEOUT_MS){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeout);try{const res=await fetch(url,{signal:controller.signal,cache:"no-store"});if(!res.ok)throw new Error(`HTTP ${res.status} — ${new URL(url).pathname}`);const json=await res.json();if(json?.success===false)throw new Error(json.error||"Worker returned success:false");return json}catch(e){if(e.name==="AbortError")throw new Error(`Request timed out after ${Math.round(timeout/1000)} seconds`);throw e}finally{clearTimeout(timer)}}
+function endpointFor(sportName,filter,offset){let params=new URLSearchParams({sport:sportName,limit:String(PAGE_SIZE),offset:String(offset)});if(filter==="today")params.set("day","today");else if(filter==="tomorrow")params.set("day","tomorrow");else if(filter==="live")params.set("live","true");return `${WORKER}/matches?${params.toString()}`}
+async function loadOne(sportName,filter){const collected=[],seen=new Set();let offset=0;for(let page=0;page<4;page++){const json=await fetchJSON(endpointFor(sportName,filter,offset));const rows=rowsFrom(json);for(const m of rows){const id=matchId(m);if(!seen.has(id)){seen.add(id);collected.push(m)}}if(!json.hasMore||!rows.length)break;const next=Number(json.nextOffset);offset=Number.isFinite(next)&&next>offset?next:offset+rows.length}return collected}
+function tasksForSelection(){const filters=S.filter==="all"?["today","tomorrow","live"]:[S.filter];const sports=S.sport==="all"?SPORTS:[S.sport];return sports.flatMap(sp=>filters.map(f=>({sport:sp,filter:f})))}
+async function fetchMatches(){if(S.busy)return;S.busy=true;$("refresh").disabled=true;setText("sourceStatus","Fetching matches from Worker…");const started=performance.now();const tasks=tasksForSelection();const settled=await Promise.allSettled(tasks.map(t=>loadOne(t.sport,t.filter)));const all=[],seen=new Set(),errors=[];for(let i=0;i<settled.length;i++){const result=settled[i];if(result.status==="rejected"){errors.push(`${tasks[i].sport}/${tasks[i].filter}: ${result.reason?.message||"request failed"}`);continue}for(const m of result.value){const id=matchId(m);if(!seen.has(id)){seen.add(id);all.push(m)}}}S.fetchMs=performance.now()-started;S.lastFetch=Date.now();S.requestErrors=errors;if(all.length){S.matches=all}else if(!S.matches.length){$("matches").innerHTML=`<div class="empty error">No matches could be loaded.<br><br>${errors.map(esc).join("<br>")||"The Worker returned no matches."}<br><br><a href="${WORKER}/health" target="_blank" rel="noopener">Check Worker health</a></div>`}setText("fetchMs",`${Math.round(S.fetchMs)} ms`);setText("lastUpdate",new Date(S.lastFetch).toLocaleTimeString());setText("sourceStatus",errors.length?`${errors.length} request(s) failed; successful results retained.`:"Worker requests completed");render();updateTokenSubscriptions();$("refresh").disabled=false;S.busy=false}
+function filtered(){const q=S.search.trim().toLowerCase();return S.matches.filter(m=>{if(S.sport!=="all"&&sport(m)!==S.sport)return false;if(S.filter==="live"&&!isLive(m))return false;const date=matchDate(m);if(S.filter==="today"&&date!==todayKey(0))return false;if(S.filter==="tomorrow"&&date!==todayKey(1))return false;const searchText=[title(m),m.slug||"",m.sport||"",...tokens(m).map(t=>t.name)].join(" ").toLowerCase();return !q||searchText.includes(q)})}
+function quoteFor(id){return S.quotes.get(String(id))||{bid:null,ask:null,bidSize:null,askSize:null,ts:null,updatedAt:null,receivedPerf:null,renderMs:null}}
+function fmtPrice(p){if(p===null||p===undefined||!Number.isFinite(Number(p)))return "—";return `${Math.round(Number(p)*100)}¢`}
+function fmtDecimal(p){const n=Number(p);if(p===null||p===undefined||!Number.isFinite(n)||n<=0)return "—";return (1/n).toFixed(2)}
+function fmtSize(n){if(n===null||n===undefined||!Number.isFinite(Number(n)))return "";return `Size ${Number(n).toLocaleString("en-IN",{maximumFractionDigits:2})}`}
+function quoteBox(label,price,size){if(price===null||price===undefined||!Number.isFinite(Number(price))||Number(price)<=0)return `<div class="quote"><div class="qlabel">${label}</div><div class="noquote">—</div><div class="decimal">No quote</div></div>`;return `<div class="quote"><div class="qlabel">${label}</div><div class="price">${fmtPrice(price)}</div><div class="decimal">Decimal ${fmtDecimal(price)}</div><div class="size">${esc(fmtSize(size))}</div></div>`}
+function marketButton(m){return `<button class="smallbtn" data-market="${esc(matchId(m))}">Markets ↗</button>`}
+function compareButton(m){return `<button class="smallbtn" data-compare="${esc(matchId(m))}">Compare ↗</button>`}
+function render(){const list=filtered();setText("counts",`${list.length} / ${new Set(list.flatMap(tokens).map(t=>t.id)).size}`);setText("summary",`${list.length} match${list.length===1?"":"es"} · ${S.filter==="all"?"Live + Today + Tomorrow":S.filter}`);if(!list.length){$("matches").innerHTML=`<div class="empty">No matching fixtures found for these filters.<br><br>Try another sport or date, or tap Refresh.</div>`;return}$("matches").innerHTML=list.map(m=>{const ts=tokens(m);const eventUrl=String(m.eventUrl||m.marketUrl||"");const date=matchDate(m);const dateText=date?formatDate(date):"Date unavailable";const stateLabel=isLive(m)?"LIVE":date===todayKey(0)?"TODAY":date===todayKey(1)?"TOMORROW":"POLYMARKET";const outcomes=ts.slice(0,2).map(t=>{const q=quoteFor(t.id);return `<div class="outcome"><div class="team">${esc(t.name)}</div><div class="quotegrid">${quoteBox("BACK · Best ask",q.ask,q.askSize)}${quoteBox("LAY · Best bid",q.bid,q.bidSize)}</div></div>`}).join("");return `<article class="match" data-match="${esc(matchId(m))}"><div class="matchhead"><div><div class="matchtitle">${esc(title(m))}</div><div class="matchmeta">${esc(dateText)} · ${esc(String(m.sport||"").toUpperCase())}<br>${ts.length} outcome token${ts.length===1?"":"s"} · Market data from Polymarket</div></div><span class="tag">${stateLabel}</span></div><div class="outcomes">${outcomes||'<div class="noquote">No outcome tokens supplied by Worker.</div>'}</div><div class="matchfoot"><span class="footnote">Quotes update when CLOB packets arrive.</span><div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">${marketButton(m)}${compareButton(m)}${eventUrl?`<a class="smallbtn" style="display:inline-block;border:1px solid var(--line);border-radius:9px;padding:7px 9px;text-decoration:none" href="${esc(eventUrl)}" target="_blank" rel="noopener">Open ↗</a>`:""}</div></div></article>`}).join("")}
+function updateButtons(container,attribute,value){container.querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset[attribute]===value))}
+$("sports").addEventListener("click",e=>{const b=e.target.closest("button[data-sport]");if(!b)return;S.sport=b.dataset.sport;updateButtons($("sports"),"sport",S.sport);fetchMatches()});
+$("filters").addEventListener("click",e=>{const b=e.target.closest("button[data-filter]");if(!b)return;S.filter=b.dataset.filter;updateButtons($("filters"),"filter",S.filter);fetchMatches()});
+$("search").addEventListener("input",e=>{S.search=e.target.value;render()});$("clearSearch").addEventListener("click",()=>{$("search").value="";S.search="";render()});$("refresh").addEventListener("click",fetchMatches);$("closeDialog").addEventListener("click",()=>$("marketDialog").close());
+$("matches").addEventListener("click",e=>{const b=e.target.closest("button[data-market]");if(!b)return;const m=S.matches.find(x=>matchId(x)===b.dataset.market);if(!m)return;setText("modalTitle",title(m));const fancy=Array.isArray(m.fancyMarkets)?m.fancyMarkets:[];const winnerUrl=m.marketUrl||m.eventUrl||"";const categories=[];if(winnerUrl||m.marketId)categories.push(`<div><strong>Match Winner</strong><br><a href="${esc(winnerUrl||m.eventUrl||"#")}" target="_blank" rel="noopener">Open actual Polymarket market ↗</a></div>`);for(const f of fancy){const name=f.title||f.question||f.name;const url=f.marketUrl||f.url;if(name&&url)categories.push(`<div><strong>${esc(name)}</strong><br><a href="${esc(url)}" target="_blank" rel="noopener">Open market ↗</a></div>`)}$("modalBody").innerHTML=categories.length?categories.join("<hr style='border:0;border-top:1px solid var(--line);margin:12px 0'>"):"Worker did not supply additional market categories for this fixture. No unavailable categories are invented.";$("marketDialog").showModal()});
+function numOrNull(v){if(v===null||v===undefined||v==="")return null;const n=Number(v);return Number.isFinite(n)?n:null}
+function ensureQuote(id){id=String(id);if(!S.quotes.has(id))S.quotes.set(id,{bid:null,ask:null,bidSize:null,askSize:null,ts:null,updatedAt:null,receivedPerf:null,renderMs:null,renderedFor:null});return S.quotes.get(id)}
+function bestLevel(levels,side){if(!Array.isArray(levels)||!levels.length)return null;const parsed=levels.map(x=>({price:numOrNull(x.price),size:numOrNull(x.size)})).filter(x=>x.price!==null);if(!parsed.length)return null;parsed.sort((a,b)=>side==="bid"?b.price-a.price:a.price-b.price);return parsed[0]}
+function sourceTimestamp(data){const v=data?.timestamp??data?.ts??data?.timestamp_ms;if(v===undefined||v===null)return null;let n=Number(v);if(!Number.isFinite(n))return null;if(n<1e12)n*=1000;return n}
+function recordPacket(data){const now=Date.now();S.packetCount++;S.packetTimes.push(now);S.packetTimes=S.packetTimes.filter(t=>now-t<=10000);S.lastPacket=now;const ts=sourceTimestamp(data);if(ts!==null)S.lastSourceTimestamp=ts;setText("pps",(S.packetTimes.length/10).toFixed(1));setText("sourceAge",S.lastSourceTimestamp?`Source timestamp age: ${Math.max(0,Date.now()-S.lastSourceTimestamp)} ms`:"Source timestamp: not provided")}
+function markQuote(q,data){q.ts=sourceTimestamp(data)||Date.now();q.updatedAt=Date.now();q.receivedPerf=S.currentPacketPerf}
+function applyBook(data){const id=String(data.asset_id||data.assetId||data.token_id||"");if(!id)return;const bid=bestLevel(data.bids,"bid"),ask=bestLevel(data.asks,"ask");const q=ensureQuote(id);q.bid=bid?bid.price:null;q.bidSize=bid?bid.size:null;q.ask=ask?ask.price:null;q.askSize=ask?ask.size:null;markQuote(q,data)}
+function applyBestBidAsk(data){const id=String(data.asset_id||data.assetId||data.token_id||"");if(!id)return;const q=ensureQuote(id);const bid=numOrNull(data.best_bid??data.bestBid),ask=numOrNull(data.best_ask??data.bestAsk);if(bid!==null)q.bid=bid;if(ask!==null)q.ask=ask;markQuote(q,data)}
+function applyPriceChanges(data){const changes=data.price_changes||data.changes;if(!Array.isArray(changes))return;for(const c of changes){const id=String(c.asset_id||c.assetId||"");if(!id)continue;const q=ensureQuote(id);const price=numOrNull(c.price),size=numOrNull(c.size),side=String(c.side||"").toUpperCase();if(side==="BUY"||side==="BID"){if(price!==null&&size===0&&q.bid===price){q.bid=null;q.bidSize=null}}else if(side==="SELL"||side==="ASK"){if(price!==null&&size===0&&q.ask===price){q.ask=null;q.askSize=null}}markQuote(q,data)}}
+function handleMessage(raw){S.currentPacketPerf=performance.now();let parsed;try{parsed=JSON.parse(raw)}catch{return}const messages=Array.isArray(parsed)?parsed:[parsed];let changed=false;for(const data of messages){if(!data||typeof data!=="object")continue;recordPacket(data);const type=String(data.event_type||data.type||"").toLowerCase();if(type==="book"){applyBook(data);changed=true}else if(type==="best_bid_ask"||type==="best-bid-ask"){applyBestBidAsk(data);changed=true}else if(type==="price_change"||type==="price-change"){applyPriceChanges(data);changed=true}else if(type==="market"){if(data.asset_id||data.bids||data.asks){applyBook(data);changed=true}}}if(changed){render();const renderedAt=performance.now();S.lastRenderMs=renderedAt-S.currentPacketPerf;for(const q of S.quotes.values()){if(q.receivedPerf===S.currentPacketPerf&&q.renderedFor!==q.receivedPerf){q.renderMs=Math.max(0,renderedAt-q.receivedPerf);q.renderedFor=q.receivedPerf}}if($("compareDialog").open&&activeCompareTokens)updateComparison(activeCompareTokens)}}
+function connectWS(){if(S.ws&&(S.ws.readyState===WebSocket.OPEN||S.ws.readyState===WebSocket.CONNECTING))return;clearTimeout(S.reconnectTimer);const generation=++S.wsGeneration;setText("wsStatus","Connecting");$("wsDot").className="dot";let ws;try{ws=new WebSocket(WS_URL)}catch(e){setText("wsStatus","Error");$("wsDot").className="dot bad";scheduleReconnect();return}S.ws=ws;ws.onopen=()=>{if(generation!==S.wsGeneration)return;S.wsOK=true;S.reconnectDelay=1000;S.subscribed.clear();setText("wsStatus","Connected");$("wsDot").className="dot good";updateTokenSubscriptions()};ws.onmessage=e=>handleMessage(e.data);ws.onerror=()=>{if(generation!==S.wsGeneration)return;setText("wsStatus","Connection error");$("wsDot").className="dot bad"};ws.onclose=()=>{if(generation!==S.wsGeneration)return;S.wsOK=false;S.subscribed.clear();setText("wsStatus","Disconnected");$("wsDot").className="dot bad";scheduleReconnect()}}
+function scheduleReconnect(){clearTimeout(S.reconnectTimer);const wait=S.reconnectDelay;S.reconnectDelay=Math.min(30000,S.reconnectDelay*2);S.reconnectTimer=setTimeout(connectWS,wait)}
+function allTokenIds(){return [...new Set(S.matches.flatMap(tokens).map(t=>String(t.id)).filter(Boolean))]}
+function updateTokenSubscriptions(){const ids=allTokenIds();S.tokenIds=ids;setText("counts",`${filtered().length} / ${ids.length}`);if(!S.ws||S.ws.readyState!==WebSocket.OPEN)return;for(let i=0;i<ids.length;i+=100){const chunk=ids.slice(i,i+100),key=chunk.join(",");if(S.subscribed.has(key))continue;try{S.ws.send(JSON.stringify({type:"market",assets_ids:chunk}));S.subscribed.add(key)}catch(e){setText("wsStatus","Subscribe error");$("wsDot").className="dot bad"}}}
+let activeCompareTokens=null,compareTimer=null;
+function comparisonQuote(t){const q=quoteFor(t.id);return {name:t.name,bid:q.bid,ask:q.ask,bidSize:q.bidSize,askSize:q.askSize,age:q.updatedAt?Math.max(0,Date.now()-q.updatedAt):null,renderMs:q.renderMs,updatedAt:q.updatedAt}}
+function comparisonBox(q){return `<div class="qlabel">BACK · Best ask</div><div class="price">${fmtPrice(q.ask)}</div><div class="decimal">Decimal ${fmtDecimal(q.ask)}</div><div class="size">${esc(fmtSize(q.askSize))}</div><hr style="border:0;border-top:1px solid var(--line);margin:10px 0"><div class="qlabel">LAY · Best bid</div><div class="price">${fmtPrice(q.bid)}</div><div class="decimal">Decimal ${fmtDecimal(q.bid)}</div><div class="size">${esc(fmtSize(q.bidSize))}</div>`}
+function updateComparison(ts){if(!ts||!ts.length)return;const a=comparisonQuote(ts[0]),b=comparisonQuote(ts[1]);$("compareQuoteA").innerHTML=comparisonBox(a);$("compareQuoteB").innerHTML=comparisonBox(b);setText("compareMetaA",`Quote age: ${a.age===null?"No quote":a.age+" ms"} · Receive → render: ${a.renderMs===null?"—":a.renderMs.toFixed(2)+" ms"}`);setText("compareMetaB",`Quote age: ${b.age===null?"No quote":b.age+" ms"} · Receive → render: ${b.renderMs===null?"—":b.renderMs.toFixed(2)+" ms"}`);setText("compareTelemetry",`WebSocket: ${S.wsOK?"Connected":"Disconnected"} · Packets received: ${S.packetCount} · Packets/sec (10s average): ${(S.packetTimes.length/10).toFixed(1)} · Last render cycle: ${S.lastRenderMs===null?"—":S.lastRenderMs.toFixed(2)+" ms"}`);let result="Waiting for fresh quotes from both outcomes.";if(a.updatedAt&&b.updatedAt){const diff=Math.abs(a.updatedAt-b.updatedAt);if(diff<50)result=`Both outcomes received quote updates within ${diff} ms. This measures browser-observed update timing, not which market feed is faster.`;else{const fresher=a.updatedAt>b.updatedAt?a:b;result=`Most recently updated quote: ${fresher.name} · Latest update timestamps differ by ${diff} ms. This does not prove feed speed or price advantage.`}}else if(a.updatedAt||b.updatedAt)result="Only one outcome has received a quote so far. Waiting for the other outcome.";setText("compareWinner",result)}
+function openComparison(m){const ts=tokens(m).slice(0,2);setText("compareTitle",title(m));activeCompareTokens=ts;if(ts.length<2){setText("compareNameA",ts[0]?.name||"Outcome A");setText("compareNameB","Second outcome unavailable");$("compareQuoteA").textContent="No second outcome token supplied.";$("compareQuoteB").textContent="Comparison requires two outcome tokens.";setText("compareMetaA","Quote age: —");setText("compareMetaB","Quote age: —");setText("compareTelemetry","Worker did not supply two outcome tokens for this match.");setText("compareWinner","No comparison winner can be calculated.")}else{setText("compareNameA",ts[0].name);setText("compareNameB",ts[1].name);updateComparison(ts)}if(!$("compareDialog").open)$("compareDialog").showModal();clearInterval(compareTimer);if(ts.length>=2)compareTimer=setInterval(()=>updateComparison(ts),250)}
+$("matches").addEventListener("click",e=>{const b=e.target.closest("button[data-compare]");if(!b)return;const m=S.matches.find(x=>matchId(x)===b.dataset.compare);if(m)openComparison(m)});
+$("closeCompare").addEventListener("click",()=>{clearInterval(compareTimer);$("compareDialog").close()});$("compareDialog").addEventListener("close",()=>clearInterval(compareTimer));
+setInterval(()=>{const now=Date.now();S.packetTimes=S.packetTimes.filter(t=>now-t<=10000);setText("pps",(S.packetTimes.length/10).toFixed(1));if(S.lastPacket&&now-S.lastPacket>30000&&S.wsOK)setText("wsStatus","Connected · quiet");if(S.lastSourceTimestamp)setText("sourceAge",`Source timestamp age: ${Math.max(0,now-S.lastSourceTimestamp)} ms`);if($("compareDialog").open&&activeCompareTokens)updateComparison(activeCompareTokens)},1000);
+setInterval(()=>{if(!S.busy)fetchMatches()},AUTO_REFRESH_MS);
+connectWS();fetchMatches();
 </script>
 </body>
 </html>
