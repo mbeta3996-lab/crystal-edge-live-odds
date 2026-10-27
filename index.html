@@ -378,10 +378,31 @@ function scheduleWS(){
  const delay=Math.min(15000,500*Math.pow(2,Math.min(S.retry,5)));
  S.reconnect=setTimeout(connectWS,delay)
 }
-async function fetchJSON(url,timeout=12000){
- const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);
- try{const res=await fetch(url,{signal:c.signal,cache:"no-store"});if(!res.ok)throw new Error(`HTTP ${res.status}`);return await res.json()}
- finally{clearTimeout(timer)}
+async function fetchJSON(url, timeout = 30000) {
+ const c = new AbortController();
+ const timer = setTimeout(() => c.abort(), timeout);
+
+ try {
+  const res = await fetch(url, {
+   signal: c.signal,
+   cache: "no-store"
+  });
+
+  if (!res.ok) {
+   throw new Error(`HTTP ${res.status}`);
+  }
+
+  return await res.json();
+
+ } catch (e) {
+  if (e.name === "AbortError") {
+   throw new Error("Worker request timed out after 30 seconds");
+  }
+  throw e;
+
+ } finally {
+  clearTimeout(timer);
+ }
 }
 function rowsFrom(json){
  if(Array.isArray(json))return json;
