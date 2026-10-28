@@ -158,8 +158,15 @@ function tokens(m){if(Array.isArray(m.tokens)&&m.tokens.length)return m.tokens.m
 
 function isLive(m){if(typeof m.live==="boolean")return m.live;return ["live","in-play","in play","in_progress","in progress"].includes(String(m.status||"").toLowerCase())}
 
-function rowsFrom(j){if(Array.isArray(j))return j;for(const k of ["data","matches","results","events"])if(Array.isArray(j?.[k]))return j[k];
+function rowsFrom(j) {
+  if (Array.isArray(j)) return j;
 
+  for (const k of ["data", "matches", "results", "events"]) {
+    if (Array.isArray(j?.[k])) return j[k];
+  }
+
+  return [];
+}
 
 async function fetchJSON(url, timeout = FETCH_TIMEOUT_MS) {
   const c = new AbortController();
@@ -191,7 +198,6 @@ async function fetchJSON(url, timeout = FETCH_TIMEOUT_MS) {
     clearTimeout(timer);
   }
 }
-
 function endpointFor(sp, f, offset) {
   const p = new URLSearchParams({
     sport: sp,
@@ -205,14 +211,6 @@ function endpointFor(sp, f, offset) {
 
   return `${WORKER}/matches?${p}`;
 }
-
-  if (f === "today") p.set("day", "today");
-  if (f === "tomorrow") p.set("day", "tomorrow");
-  if (f === "live") p.set("live", "true");
-
-  return `${WORKER}/matches?${p}`;
-}
-
 async function loadOne(sp, f = "all") {
   const out = [];
   const seen = new Set();
@@ -232,7 +230,9 @@ async function loadOne(sp, f = "all") {
     }
 
     const next = Number(j.nextOffset);
-    const total = Number(j.totalMatchesFound);
+  const total = Number(
+  j.totalFoundInScannedPages ?? j.totalMatchesFound
+); 
 
     const hasMore =
       j.hasMore === true ||
@@ -374,15 +374,30 @@ function render(){
  $("matches").innerHTML=list.map(m=>{
 
   const ts=tokens(m),url=String(m.eventUrl||m.marketUrl||""),d=matchDate(m),state=isLive(m)?"LIVE":d===todayKey()?"TODAY":d===todayKey(1)?"TOMORROW":"POLYMARKET";
+ 
+const outcomes = ts.slice(0, 2).map(t => {
+  const q = quoteFor(t.id);
 
-  const outcomes=ts.slice(0,2).map((t,i)=>{const q=quoteFor(t.id),p=i===0?q.ask:q.bid,size=i===0?q.askSize:q.bidSize;return `<div class="outcome"><div class="team">${esc(t.name)}</div><div class="quote"><div class="qlabel">${i===0?"BUY / BACK · Moneyline":"SELL / LAY · Moneyline"}</div><div class="price">${fmtPrice(p)}</div><div class="decimal">Decimal ${fmtDecimal(p)}</div><div class="size">${esc(fmtSize(size))}</div></div></div>`}).join("");
+  return `
+    <div class="outcome">
+      <div class="team">${esc(t.name)}</div>
 
-  return `<article class="match"><div class="matchhead"><div><div class="matchtitle">${esc(title(m))}</div><div class="matchmeta">${esc(formatDate(d))} · ${esc(String(m.sport||"").toUpperCase())}<br>${ts.length} outcome tokens · Polymarket</div></div><span class="tag">${state}</span></div><div class="outcomes">${outcomes||'<div class="noquote">No outcome tokens supplied.</div>'}</div><div class="matchfoot"><span class="footnote">Live CLOB quotes</span><div style="display:flex;gap:6px;flex-wrap:wrap">${marketButton(m)}${compareButton(m)}${url?`<a class="smallbtn" style="border:1px solid var(--line);border-radius:9px;padding:7px 9px;text-decoration:none" href="${esc(url)}" target="_blank" rel="noopener">Open ↗</a>`:""}</div></div></article>`;
+      <div class="quote">
+        <div class="qlabel">BUY / BACK · BEST ASK</div>
+        <div class="price">${fmtPrice(q.ask)}</div>
+        <div class="decimal">Decimal ${fmtDecimal(q.ask)}</div>
+        <div class="size">${esc(fmtSize(q.askSize))}</div>
+      </div>
 
- }).join("");
-
-}
-
+      <div class="quote">
+        <div class="qlabel">SELL / LAY · BEST BID</div>
+        <div class="price">${fmtPrice(q.bid)}</div>
+        <div class="decimal">Decimal ${fmtDecimal(q.bid)}</div>
+        <div class="size">${esc(fmtSize(q.bidSize))}</div>
+      </div>
+    </div>
+  `;
+}).join("");
 function updateButtons(el,key,value){el.querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset[key]===value))}
 
 $("sports").addEventListener("click",e=>{const b=e.target.closest("[data-sport]");if(!b)return;S.sport=b.dataset.sport;updateButtons($("sports"),"sport",S.sport);fetchMatches()});
