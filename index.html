@@ -160,33 +160,158 @@ function isLive(m){if(typeof m.live==="boolean")return m.live;return ["live","in
 
 function rowsFrom(j){if(Array.isArray(j))return j;for(const k of ["data","matches","results","events"])if(Array.isArray(j?.[k]))return j[k];return []}
 
-async function fetchJSON(url,timeout=FETCH_TIMEOUT_MS){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(url,{signal:c.signal,cache:"no-store"});if(!r.ok)throw Error(`HTTP ${r.status} — ${new URL(url).pathname}`);const j=await r.json();if(j?.success===false)throw Error(j.error||"Worker returned success:false");return j}catch(e){if(e.name==="AbortError")throw Error(`Request timed out after ${timeout/1000} seconds`);throw e}finally{clearTimeout(timer)}}
+async function fetchJSON(url,timeout=FETCH_TIMEOUT_MS){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(url,{signal:c.signal,cache:"no-store"});if(!r.ok)throw Error(`HTTP ${r.status} — ${new URL(url).pathname}`);const j=await r.json();if(j?.success===false)throw Error(j.error||"Worker returned success:false");return j}catch(e){if(e.name==="AbortError")throw Error(`Request timed out after ${timeout/1000} seconds`);throw e}finally{clearTimeout(
+function endpointFor(sp, f, offset) {
+  const p = new URLSearchParams({
+    sport: sp,
+    limit: String(PAGE_SIZE),
+    offset: String(offset)
+  });
 
-function endpointFor(sp,f,offset){const p=new URLSearchParams({sport:sp,limit:String(PAGE_SIZE),offset:String(offset)});if(f==="today")p.set("day","today");if(f==="tomorrow")p.set("day","tomorrow");if(f==="live")p.set("live","true");return `${WORKER}/matches?${p}`}
+  if (f === "today") p.set("day", "today");
+  if (f === "tomorrow") p.set("day", "tomorrow");
+  if (f === "live") p.set("live", "true");
 
-async function loadOne(sp,f){const out=[],seen=new Set();let offset=0;for(let page=0;page<4;page++){const j=await fetchJSON(endpointFor(sp,f,offset)),rows=rowsFrom(j);for(const m of rows){const id=matchId(m);if(!seen.has(id)){seen.add(id);out.push(m)}}if(!j.hasMore||!rows.length)break;const n=Number(j.nextOffset);offset=Number.isFinite(n)&&n>offset?n:offset+rows.length}return out}
-
-function tasksForSelection(){const fs=S.filter==="all"?["today","tomorrow","live"]:[S.filter],ss=S.sport==="all"?SPORTS:[S.sport];return ss.flatMap(sp=>fs.map(f=>({sport:sp,filter:f})))}
-
-async function fetchMatches(){
-
- if(S.busy)return;S.busy=true;$("refresh").disabled=true;setText("sourceStatus","Fetching matches from Worker…");
-
- const start=performance.now(),tasks=tasksForSelection(),settled=await Promise.allSettled(tasks.map(t=>loadOne(t.sport,t.filter))),all=[],seen=new Set(),errors=[];
-
- settled.forEach((r,i)=>{if(r.status==="rejected"){errors.push(`${tasks[i].sport}/${tasks[i].filter}: ${r.reason?.message||"request failed"}`);return}r.value.forEach(m=>{const id=matchId(m);if(!seen.has(id)){seen.add(id);all.push(m)}})});
-
- S.fetchMs=performance.now()-start;S.lastFetch=Date.now();S.requestErrors=errors;
-
- if(all.length)S.matches=all;
-
- else if(!S.matches.length)$("matches").innerHTML=`<div class="empty error">No matches loaded.<br>${errors.map(esc).join("<br>")||"Worker returned no matches."}<br><br><a href="${WORKER}/health" target="_blank" rel="noopener">Check Worker health</a></div>`;
-
- setText("fetchMs",`${Math.round(S.fetchMs)} ms`);setText("lastUpdate",new Date(S.lastFetch).toLocaleTimeString());setText("sourceStatus",errors.length?`${errors.length} request(s) failed; successful results retained.`:"Worker requests completed");
-
- render();updateTokenSubscriptions();$("refresh").disabled=false;S.busy=false;
-
+  return `${WORKER}/matches?${p}`;
 }
+
+async function loadOne(sp, f = "all") {
+  const out = [];
+  const seen = new Set();
+  let offset = 0;
+
+  for (let page = 0; page < 100; page++) {
+    const j = await fetchJSON(endpointFor(sp, f, offset));
+    const rows = rowsFrom(j);
+
+    for (const m of rows) {
+      const id = matchId(m);
+
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push(m);
+      }
+    }
+
+    const next = Number(j.nextOffset);
+    const total = Number(j.totalMatchesFound);
+
+    const hasMore =
+      j.hasMore === true ||
+      (j.hasMore == null &&
+        Number.isFinite(total) &&
+        total > offset + rows.length);
+
+    if (!hasMore || !rows.length) break;
+
+    const nextOffset =
+      Number.isFinite(next) && next > offset
+        ? next
+        : offset + rows.length;
+
+    if (nextOffset <= offset) break;
+    offset = nextOffset;
+  }
+
+  return out;
+}
+
+function tasksForSelection() {
+  // Load all available dates plus the explicit live feed.
+  return SPORTS.flatMap(sp => [
+    { sport: sp, filter: "all" },
+    { sport: sp, filter: "live" }
+  ]);
+}
+
+async function fetchMatches() {
+  if (S.busy) return;
+
+  S.busy = true;
+  $("refresh").disabled = true;
+  setText("sourceStatus", "Loading all Polymarket matches…");
+
+  const start = performance.now();
+  const tasks = tasksForSelection();
+
+  try {
+    const settled = await Promise.allSettled(
+      tasks.map(t => loadOne(t.sport, t.filter))
+    );
+
+    const merged = new Map();
+    const errors = [];
+
+    settled.forEach((r, i) => {
+      if (r.status === "rejected") {
+        errors.push(
+          `${tasks[i].sport}/${tasks[i].filter}: ${
+            r.reason?.message || "request failed"
+          }`
+        );
+        return;
+      }
+
+      for (const m of r.value) {
+        const id = matchId(m);
+        const old = merged.get(id);
+
+        if (!old) {
+          merged.set(id, m);
+        } else {
+          merged.set(id, { ...old, ...m });
+        }
+      }
+    });
+
+    const all = [...merged.values()].filter(m =>
+      SPORTS.includes(sport(m))
+    );
+
+    S.fetchMs = performance.now() - start;
+    S.lastFetch = Date.now();
+    S.requestErrors = errors;
+
+    if (all.length > 0) {
+      S.matches = all;
+    }
+
+    setText("fetchMs", `${Math.round(S.fetchMs)} ms`);
+    setText(
+      "lastUpdate",
+      new Date(S.lastFetch).toLocaleTimeString()
+    );
+
+    setText(
+      "sourceStatus",
+      errors.length
+        ? `${S.matches.length} matches retained; ${errors.length} request(s) failed.`
+        : `${S.matches.length} matches loaded from Worker.`
+    );
+
+    if (!S.matches.length) {
+      $("matches").innerHTML =
+        `<div class="empty error">No matches loaded.<br>` +
+        `${errors.map(esc).join("<br>") ||
+          "Worker returned no matches."}<br><br>` +
+        `<a href="${WORKER}/health" target="_blank" rel="noopener">` +
+        `Check Worker health</a></div>`;
+    }
+
+    render();
+    updateTokenSubscriptions();
+
+  } catch (e) {
+    setText("sourceStatus", `Fetch error: ${e.message}`);
+    render();
+  } finally {
+    S.busy = false;
+    $("refresh").disabled = false;
+  }
+}
+
+
+
 
 function filtered(){const q=S.search.trim().toLowerCase();return S.matches.filter(m=>{if(S.sport!=="all"&&sport(m)!==S.sport)return false;if(S.filter==="live"&&!isLive(m))return false;const d=matchDate(m);if(S.filter==="today"&&d!==todayKey())return false;if(S.filter==="tomorrow"&&d!==todayKey(1))return false;return !q||[title(m),m.slug||"",m.sport||"",...tokens(m).map(t=>t.name)].join(" ").toLowerCase().includes(q)})}
 
