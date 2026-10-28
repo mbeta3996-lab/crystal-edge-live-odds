@@ -158,15 +158,53 @@ function tokens(m){if(Array.isArray(m.tokens)&&m.tokens.length)return m.tokens.m
 
 function isLive(m){if(typeof m.live==="boolean")return m.live;return ["live","in-play","in play","in_progress","in progress"].includes(String(m.status||"").toLowerCase())}
 
-function rowsFrom(j){if(Array.isArray(j))return j;for(const k of ["data","matches","results","events"])if(Array.isArray(j?.[k]))return j[k];return []}
+function rowsFrom(j){if(Array.isArray(j))return j;for(const k of ["data","matches","results","events"])if(Array.isArray(j?.[k]))return j[k];
 
-async function fetchJSON(url,timeout=FETCH_TIMEOUT_MS){const c=new AbortController(),timer=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(url,{signal:c.signal,cache:"no-store"});if(!r.ok)throw Error(`HTTP ${r.status} — ${new URL(url).pathname}`);const j=await r.json();if(j?.success===false)throw Error(j.error||"Worker returned success:false");return j}catch(e){if(e.name==="AbortError")throw Error(`Request timed out after ${timeout/1000} seconds`);throw e}finally{clearTimeout(
+
+async function fetchJSON(url, timeout = FETCH_TIMEOUT_MS) {
+  const c = new AbortController();
+  const timer = setTimeout(() => c.abort(), timeout);
+
+  try {
+    const r = await fetch(url, {
+      signal: c.signal,
+      cache: "no-store"
+    });
+
+    if (!r.ok) {
+      throw Error(`HTTP ${r.status} — ${new URL(url).pathname}`);
+    }
+
+    const j = await r.json();
+
+    if (j?.success === false) {
+      throw Error(j.error || "Worker returned success:false");
+    }
+
+    return j;
+  } catch (e) {
+    if (e.name === "AbortError") {
+      throw Error(`Request timed out after ${timeout / 1000} seconds`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function endpointFor(sp, f, offset) {
   const p = new URLSearchParams({
     sport: sp,
     limit: String(PAGE_SIZE),
     offset: String(offset)
   });
+
+  if (f === "today") p.set("day", "today");
+  if (f === "tomorrow") p.set("day", "tomorrow");
+  if (f === "live") p.set("live", "true");
+
+  return `${WORKER}/matches?${p}`;
+}
 
   if (f === "today") p.set("day", "today");
   if (f === "tomorrow") p.set("day", "tomorrow");
