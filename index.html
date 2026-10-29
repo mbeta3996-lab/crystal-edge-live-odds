@@ -638,8 +638,8 @@ function updateTokenSubscriptions(){
   for(let i=0;i<ids.length;i+=100){
     const c=ids.slice(i,i+100),k=c.join(",");
     if(S.subscribed.has(k))continue;
-    try{
-      S.ws.send(JSON.stringify({type:"market",assets_ids:c}));
+    try
+    {S.ws.send(JSON.stringify({type:"subscribe",assets_ids:c}));
       S.subscribed.add(k);
     }catch(e){
       setText("wsStatus","Subscribe error");
