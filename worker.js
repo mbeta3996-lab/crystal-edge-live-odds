@@ -1,7 +1,7 @@
 const GAMMA = "https://gamma-api.polymarket.com";
 const ALLOWED_SPORTS = ["cricket", "tennis", "soccer"];
 const PAGE_SIZE = 100;
-const MAX_PAGES_PER_SPORT = 4;
+const MAX_PAGES_PER_SPORT = 12;
 const CACHE_TTL_MS = 60000;
 const CACHE = new Map();
 
@@ -257,7 +257,7 @@ async function fetchPage(offset, sport) {
   u.searchParams.set("limit", String(PAGE_SIZE));
   u.searchParams.set("offset", String(offset));
   u.searchParams.set("order", "startDate");
-  u.searchParams.set("ascending", "true");
+  u.searchParams.set("ascending", "false");
   u.searchParams.set("tag_slug", sport);
   u.searchParams.set("include_tag", "true");
 
