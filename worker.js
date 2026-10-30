@@ -5,11 +5,7 @@ const PAGE_SIZE = 100;
 const MAX_PAGES_PER_SPORT = 12;
 const CACHE_TTL_MS = 12000;
 
-const CACHE = {
-  at: 0,
-  value: null,
-  pending: null
-};
+const CACHE = new Map();
 
 const HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -94,27 +90,62 @@ function eventText(e) {
   const tags = arr(e?.tags).map(t =>
     typeof t === "string"
       ? t
-      : [t?.label, t?.slug, t?.name]
-          .filter(Boolean)
-          .join(" ")
+      : [
+          t?.label,
+          t?.slug,
+          t?.name
+        ].filter(Boolean).join(" ")
   );
 
-  return norm(
-    [
-      e?.title,
-      e?.slug,
-      e?.description,
-      e?.ticker,
-      e?.series?.title,
-      ...tags
-    ]
-      .filter(Boolean)
-      .join(" ")
-  );
+  const series = [
+    e?.series?.title,
+    e?.series?.slug,
+    e?.series?.name
+  ];
+
+  const sportInfo = [
+    e?.sport,
+    e?.sport?.name,
+    e?.sport?.slug,
+    e?.sportsMarketType
+  ];
+
+  return norm([
+    e?.title,
+    e?.slug,
+    e?.description,
+    e?.ticker,
+    ...series,
+    ...sportInfo,
+    ...tags
+  ].filter(Boolean).join(" "));
 }
 
 function sportOf(e) {
-  const t = eventText(e);
+  const tags = arr(e?.tags).map(t =>
+    norm(
+      typeof t === "string"
+        ? t
+        : `${t?.label ?? ""} ${t?.slug ?? ""} ${t?.name ?? ""}`
+    )
+  );
+
+  const seriesSlug = norm(e?.series?.slug);
+  const seriesTitle = norm(e?.series?.title);
+  const sportName = norm(
+    typeof e?.sport === "object"
+      ? `${e?.sport?.name ?? ""} ${e?.sport?.slug ?? ""}`
+      : e?.sport
+  );
+
+  const explicit = [
+    ...tags,
+    seriesSlug,
+    seriesTitle,
+    sportName
+  ].join(" ");
+
+  const t = `${eventText(e)} ${explicit}`;
 
   if (
     /\b(bitcoin|ethereum|crypto|s&p 500|nasdaq|dow jones|gold price|election|fomc|federal reserve|interest rate|ballon d'or|ballon dor|top scorer award|league winner|season winner|outright)\b/.test(t)
@@ -135,7 +166,10 @@ function sportOf(e) {
   }
 
   if (
-    /\b(soccer|football|premier league|champions league|europa league|la liga|serie a|bundesliga|ligue 1|mls|fa cup|world cup|epl|uefa|fifa|eredivisie|copa)\b/.test(t)
+    tags.some(x =>
+      /\b(soccer|football)\b/.test(x)
+    ) ||
+    /\b(soccer|football|premier league|champions league|europa league|la liga|serie a|bundesliga|ligue 1|mls|fa cup|world cup|epl|uefa|fifa|eredivisie|copa|a-league)\b/.test(t)
   ) {
     return "soccer";
   }
@@ -147,13 +181,12 @@ function matchupTitle(title) {
   const t = norm(title);
 
   if (
-    !t ||
-    /\b(outright|champion|championship winner|league winner|season winner|top scorer|relegat|qualify for|tournament winner|mvp|award|price target)\b/.test(t)
+    /\b(outright|champion|championship winner|league winner|season winner)\b/.test(t)
   ) {
     return false;
   }
 
-  return /\b(vs\.?|v\.?|versus)\b/i.test(t);
+  return /\b(vs\.?|v\.?|versus)\b/.test(t);
 }
 
 function marketKind(m, eventTitle) {
@@ -164,50 +197,68 @@ function marketKind(m, eventTitle) {
     ""
   );
 
-  const combined = `${norm(eventTitle)} ${q}`;
+  const event = norm(eventTitle);
 
   const excluded =
-    /\b(total corners?|corners?|over\/under|over or under|\bo\/u\b|totals?|both teams to score|double chance|handicap|spread|player props?|shots?|cards?|yellow cards?|red cards?|sets? handicap|games? handicap|total games?|total sets?|aces|break points|first half|half time|correct score|winning margin|race to|team total|runs? total|wickets?|six(es)?|fours?|top scorer|anytime scorer|first goal|next goal|penalt(y|ies)|to qualify|tournament winner|series winner)\b/;
+    /\b(toss|set\s*\d*|first set|second set|third set|fourth set|fifth set|game winner|total games|total sets|handicap|spread|over\/under|over or under|total corners?|corners?|both teams to score|double chance|correct score|winning margin|race to|team total|runs total|wickets?|sixes|fours|top scorer|anytime scorer|first goal|next goal|penalt(y|ies)|to qualify|tournament winner|series winner|match goes to day)\b/;
 
   if (excluded.test(q)) return null;
 
-  const outs = outcomes(m).map(norm);
+  const outs = outcomes(m).map(x => norm(x));
   const ids = tokenIds(m);
 
-  if (ids.length < 2) return null;
-  if (!truthyOpen(m)) return null;
+  if (ids.length < 2 || !truthyOpen(m)) return null;
+  if (outs.length < 2) return null;
+
+  // Soccer 3-way Match Winner:
+  // Gamma represents Home, Draw and Away as separate Yes/No markets.
+  // selectionLine is top-level in the supplied Gamma event structure.
+  const selectionLine = String(
+    m?.selectionLine ??
+    m?.marketMetadata?.selectionLine ??
+    ""
+  ).toLowerCase();
+
+  const opticMarketId = String(
+    m?.marketMetadata?.opticOddsMarketId ?? ""
+  ).toLowerCase();
+
+  const marketType = String(
+    m?.sportsMarketType ?? ""
+  ).toLowerCase();
+
+  const isFootballThreeWay =
+    marketType === "moneyline" &&
+    opticMarketId === "moneyline_3-way" &&
+    ["home", "draw", "away"].includes(selectionLine);
+
+  if (
+    isFootballThreeWay &&
+    outs.includes("yes") &&
+    outs.includes("no")
+  ) {
+    return {
+      kind: "winner",
+      score: 20
+    };
+  }
+
+  // Reject other ordinary Yes/No markets.
+  if (outs.includes("yes") && outs.includes("no")) {
+    return null;
+  }
 
   const winnerWords =
-    /\b(winner|to win|win the match|match winner|moneyline|match result|result of the match|will .* win)\b/.test(q);
+    /\b(match winner|to win the match|wins? the match|match result|moneyline|winner of the match)\b/.test(q);
 
   const neutralMatchQuestion =
-    q === norm(eventTitle) ||
-    q === "" ||
-    /\b(vs\.?|v\.?|versus)\b/.test(q);
-
-  const yesNo =
-    outs.length === 2 &&
-    outs.includes("yes") &&
-    outs.includes("no");
-
-  if (yesNo) return null;
-  if (outs.length < 2) return null;
+    q === event ||
+    q === `${event} - more markets`;
 
   if (winnerWords || neutralMatchQuestion) {
     return {
       kind: "winner",
       score: winnerWords ? 10 : 8
-    };
-  }
-
-  if (
-    outs.length === 2 &&
-    /\b(vs\.?|v\.?|versus)\b/.test(combined) &&
-    !excluded.test(combined)
-  ) {
-    return {
-      kind: "winner",
-      score: 5
     };
   }
 
@@ -386,7 +437,9 @@ async function fetchPage(offset, sport) {
   u.searchParams.set("limit", String(PAGE_SIZE));
   u.searchParams.set("offset", String(offset));
   u.searchParams.set("order", "startDate");
-  u.searchParams.set("ascending", "true");
+
+  // Fetch newer events first instead of starting from old events.
+  u.searchParams.set("ascending", "false");
 
   const tag = sport === "soccer" ? "soccer" : sport;
 
@@ -413,44 +466,54 @@ async function fetchPage(offset, sport) {
   return Array.isArray(d) ? d : [];
 }
 
-async function scan() {
-  const jobs = [];
+/* -------------------------------------------------------
+   INDIVIDUAL SPORT SCAN
+------------------------------------------------------- */
 
-  for (const sport of ALLOWED_SPORTS) {
-    for (let p = 0; p < MAX_PAGES_PER_SPORT; p++) {
-      jobs.push({
-        sport,
-        offset: p * PAGE_SIZE
-      });
-    }
-  }
-
-  const results = await Promise.allSettled(
-    jobs.map(j => fetchPage(j.offset, j.sport))
-  );
+async function scan(requestedSport = "all") {
+  const sports = requestedSport === "all"
+    ? ALLOWED_SPORTS
+    : [requestedSport];
 
   const raw = new Map();
   const errors = [];
 
-  results.forEach((r, i) => {
-    if (r.status === "fulfilled") {
-      for (const e of r.value) {
-        if (e?.id != null) {
-          raw.set(String(e.id), e);
-        }
-      }
-    } else {
-      errors.push({
-        sport: jobs[i].sport,
-        offset: jobs[i].offset,
-        error: String(r.reason?.message ?? r.reason)
-      });
-    }
-  });
+  for (const sport of sports) {
+    for (let p = 0; p < MAX_PAGES_PER_SPORT; p++) {
+      const offset = p * PAGE_SIZE;
 
-  const rows = [...raw.values()]
-    .map(eventSummary)
-    .filter(Boolean);
+      try {
+        const events = await fetchPage(offset, sport);
+
+        for (const e of events) {
+          if (e?.id != null) {
+            raw.set(String(e.id), e);
+          }
+        }
+
+        if (events.length < PAGE_SIZE) {
+          break;
+        }
+
+      } catch (e) {
+        errors.push({
+          sport,
+          offset,
+          error: String(e?.message ?? e)
+        });
+
+        break;
+      }
+    }
+  }
+
+  const rows = [];
+
+  for (const e of raw.values()) {
+    const row = eventSummary(e);
+
+    if (row) rows.push(row);
+  }
 
   const unique = new Map(
     rows.map(x => [x.id, x])
@@ -464,37 +527,56 @@ async function scan() {
 
   return {
     data,
-    scannedEvents: [...raw.values()].length,
+    scannedEvents: raw.size,
     uniqueEvents: raw.size,
     errors,
     fetchedAt: new Date().toISOString()
   };
 }
 
-async function getData(force = false) {
+/* -------------------------------------------------------
+   SEPARATE CACHE PER SPORT
+------------------------------------------------------- */
+
+async function getData(force = false, requestedSport = "all") {
+  const key = requestedSport;
+  const now = Date.now();
+
+  let entry = CACHE.get(key);
+
+  if (!entry) {
+    entry = {
+      at: 0,
+      value: null,
+      pending: null
+    };
+
+    CACHE.set(key, entry);
+  }
+
   if (
     !force &&
-    CACHE.value &&
-    Date.now() - CACHE.at < CACHE_TTL_MS
+    entry.value &&
+    now - entry.at < CACHE_TTL_MS
   ) {
-    return CACHE.value;
+    return entry.value;
   }
 
-  if (!force && CACHE.pending) {
-    return CACHE.pending;
+  if (!force && entry.pending) {
+    return entry.pending;
   }
 
-  CACHE.pending = scan()
-    .then(v => {
-      CACHE.value = v;
-      CACHE.at = Date.now();
-      return v;
+  entry.pending = scan(requestedSport)
+    .then(result => {
+      entry.value = result;
+      entry.at = Date.now();
+      return result;
     })
     .finally(() => {
-      CACHE.pending = null;
+      entry.pending = null;
     });
 
-  return CACHE.pending;
+  return entry.pending;
 }
 
 async function fetchEvent(id) {
@@ -533,7 +615,7 @@ export default {
       });
     }
 
-    // VPS WebSocket relay
+    // VPS WebSocket relay - unchanged
     if (path === "/ws") {
       if (
         request.headers.get("Upgrade")?.toLowerCase() !==
@@ -637,6 +719,7 @@ export default {
           allowedSports: ALLOWED_SPORTS,
           pageSize: PAGE_SIZE,
           maxPagesPerSport: MAX_PAGES_PER_SPORT,
+          scanMode: "sequential-per-sport",
           endpoints: [
             "/health",
             "/sports",
@@ -722,7 +805,7 @@ export default {
         const force =
           url.searchParams.get("refresh") === "1";
 
-        const result = await getData(force);
+        const result = await getData(force, sport);
 
         const filtered = result.data.filter(
           x => sport === "all" || x.sport === sport
