@@ -86,66 +86,24 @@ function outcomes(m) {
   );
 }
 
-function eventText(e) {
+  function eventText(e) {
   const tags = arr(e?.tags).map(t =>
     typeof t === "string"
       ? t
-      : [
-          t?.label,
-          t?.slug,
-          t?.name
-        ].filter(Boolean).join(" ")
+      : [t?.label, t?.slug, t?.name].filter(Boolean).join(" ")
   );
-
-  const series = [
-    e?.series?.title,
-    e?.series?.slug,
-    e?.series?.name
-  ];
-
-  const sportInfo = [
-    e?.sport,
-    e?.sport?.name,
-    e?.sport?.slug,
-    e?.sportsMarketType
-  ];
 
   return norm([
     e?.title,
     e?.slug,
     e?.description,
     e?.ticker,
-    ...series,
-    ...sportInfo,
+    e?.series?.title,
     ...tags
   ].filter(Boolean).join(" "));
 }
-
 function sportOf(e) {
-  const tags = arr(e?.tags).map(t =>
-    norm(
-      typeof t === "string"
-        ? t
-        : `${t?.label ?? ""} ${t?.slug ?? ""} ${t?.name ?? ""}`
-    )
-  );
-
-  const seriesSlug = norm(e?.series?.slug);
-  const seriesTitle = norm(e?.series?.title);
-  const sportName = norm(
-    typeof e?.sport === "object"
-      ? `${e?.sport?.name ?? ""} ${e?.sport?.slug ?? ""}`
-      : e?.sport
-  );
-
-  const explicit = [
-    ...tags,
-    seriesSlug,
-    seriesTitle,
-    sportName
-  ].join(" ");
-
-  const t = `${eventText(e)} ${explicit}`;
+  const t = eventText(e);
 
   if (
     /\b(bitcoin|ethereum|crypto|s&p 500|nasdaq|dow jones|gold price|election|fomc|federal reserve|interest rate|ballon d'or|ballon dor|top scorer award|league winner|season winner|outright)\b/.test(t)
@@ -166,10 +124,7 @@ function sportOf(e) {
   }
 
   if (
-    tags.some(x =>
-      /\b(soccer|football)\b/.test(x)
-    ) ||
-    /\b(soccer|football|premier league|champions league|europa league|la liga|serie a|bundesliga|ligue 1|mls|fa cup|world cup|epl|uefa|fifa|eredivisie|copa|a-league)\b/.test(t)
+    /\b(soccer|football|premier league|champions league|europa league|la liga|serie a|bundesliga|ligue 1|mls|fa cup|world cup|epl|uefa|fifa|eredivisie|copa)\b/.test(t)
   ) {
     return "soccer";
   }
@@ -177,18 +132,15 @@ function sportOf(e) {
   return null;
 }
 
-function matchupTitle(title) {
+  function matchupTitle(title) {
   const t = norm(title);
 
-  if (
-    /\b(outright|champion|championship winner|league winner|season winner)\b/.test(t)
-  ) {
+  if (/\b(outright|champion|championship winner|league winner|season winner)\b/.test(t)) {
     return false;
   }
 
-  return /\b(vs\.?|v\.?|versus)\b/.test(t);
+  return /\b(vs\.?|v\.?|versus)\b/i.test(t);
 }
-
 function marketKind(m, eventTitle) {
   const q = norm(
     m?.question ??
@@ -210,43 +162,22 @@ function marketKind(m, eventTitle) {
   if (ids.length < 2 || !truthyOpen(m)) return null;
   if (outs.length < 2) return null;
 
-  // Soccer 3-way Match Winner:
-  // Gamma represents Home, Draw and Away as separate Yes/No markets.
-  // selectionLine is top-level in the supplied Gamma event structure.
-  const selectionLine = String(
-    m?.selectionLine ??
-    m?.marketMetadata?.selectionLine ??
-    ""
-  ).toLowerCase();
-
-  const opticMarketId = String(
-    m?.marketMetadata?.opticOddsMarketId ?? ""
-  ).toLowerCase();
-
-  const marketType = String(
-    m?.sportsMarketType ?? ""
-  ).toLowerCase();
-
   const isFootballThreeWay =
-    marketType === "moneyline" &&
-    opticMarketId === "moneyline_3-way" &&
-    ["home", "draw", "away"].includes(selectionLine);
+    String(m?.sportsMarketType || "").toLowerCase() === "moneyline" &&
+    String(m?.marketMetadata?.opticOddsMarketId || "").toLowerCase() === "moneyline_3-way" &&
+    ["home", "draw", "away"].includes(
+      String(m?.marketMetadata?.selectionLine || "").toLowerCase()
+    );
 
   if (
     isFootballThreeWay &&
     outs.includes("yes") &&
     outs.includes("no")
   ) {
-    return {
-      kind: "winner",
-      score: 20
-    };
+    return { kind: "winner", score: 20 };
   }
 
-  // Reject other ordinary Yes/No markets.
-  if (outs.includes("yes") && outs.includes("no")) {
-    return null;
-  }
+  if (outs.includes("yes") && outs.includes("no")) return null;
 
   const winnerWords =
     /\b(match winner|to win the match|wins? the match|match result|moneyline|winner of the match)\b/.test(q);
@@ -264,7 +195,7 @@ function marketKind(m, eventTitle) {
 
   return null;
 }
-
+  // Do not accept ordinary Yes/No markets as match winners.
 function normaliseMarket(m, event) {
   const ids = tokenIds(m);
   const names = outcomes(m);
@@ -437,11 +368,11 @@ async function fetchPage(offset, sport) {
   u.searchParams.set("limit", String(PAGE_SIZE));
   u.searchParams.set("offset", String(offset));
   u.searchParams.set("order", "startDate");
-
-  // Fetch newer events first instead of starting from old events.
-  u.searchParams.set("ascending", "false");
-
-  const tag = sport === "soccer" ? "soccer" : sport;
+  u.searchParams.set(
+  "ascending",
+  sport === "soccer" ? "false" : "true"
+);
+ const tag = sport === "soccer" ? "soccer" : sport;
 
   u.searchParams.set("tag_slug", tag);
   u.searchParams.set("include_tag", "true");
@@ -467,7 +398,9 @@ async function fetchPage(offset, sport) {
 }
 
 /* -------------------------------------------------------
-   INDIVIDUAL SPORT SCAN
+   NEW SCAN LOGIC
+   Individual sports scan independently.
+   Pages are fetched sequentially to reduce Worker load.
 ------------------------------------------------------- */
 
 async function scan(requestedSport = "all") {
@@ -535,7 +468,7 @@ async function scan(requestedSport = "all") {
 }
 
 /* -------------------------------------------------------
-   SEPARATE CACHE PER SPORT
+   NEW SEPARATE CACHE PER SPORT
 ------------------------------------------------------- */
 
 async function getData(force = false, requestedSport = "all") {
@@ -615,7 +548,7 @@ export default {
       });
     }
 
-    // VPS WebSocket relay - unchanged
+    // VPS WebSocket relay
     if (path === "/ws") {
       if (
         request.headers.get("Upgrade")?.toLowerCase() !==
@@ -805,6 +738,7 @@ export default {
         const force =
           url.searchParams.get("refresh") === "1";
 
+        // IMPORTANT: scan only the requested sport.
         const result = await getData(force, sport);
 
         const filtered = result.data.filter(
