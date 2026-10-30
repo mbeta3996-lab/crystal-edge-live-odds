@@ -1,804 +1,768 @@
-
-"use strict";
-
 const GAMMA = "https://gamma-api.polymarket.com";
-const CLOB = "https://clob.polymarket.com";
 
-const ALLOWED = ["cricket", "tennis", "football"];
-const PAGE_SIZE = 50;
-const MAX_PAGES = 40;
-const FETCH_TIMEOUT_MS = 12000;
+const ALLOWED_SPORTS = ["cricket", "tennis", "soccer"];
+const PAGE_SIZE = 100;
+const MAX_PAGES_PER_SPORT = 12;
+const CACHE_TTL_MS = 12000;
+
+const CACHE = {
+  at: 0,
+  value: null,
+  pending: null
+};
 
 const HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
-  "Cache-Control": "no-store",
-  "Content-Type": "application/json; charset=utf-8"
+  "Content-Type": "application/json; charset=utf-8",
+  "Cache-Control": "no-store"
 };
 
-function reply(data, status = 200) {
+function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: HEADERS
   });
 }
 
-function arr(value) {
-  if (Array.isArray(value)) return value;
-  if (typeof value !== "string") return [];
+function norm(v) {
+  return String(v ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[’']/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function arr(v) {
+  if (Array.isArray(v)) return v;
+
+  if (typeof v !== "string") return [];
 
   try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
+    const x = JSON.parse(v);
+    return Array.isArray(x) ? x : [];
   } catch {
     return [];
   }
 }
 
-function str(value) {
-  if (value == null) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number") return String(value);
-  if (typeof value === "object") {
-    return String(
-      value.label ??
-      value.name ??
-      value.value ??
-      value.title ??
-      ""
-    ).trim();
-  }
-  return "";
-}
-
-function truthy(value) {
-  return value === true ||
-    value === 1 ||
-    value === "true" ||
-    value === "1";
-}
-
-function validDate(value) {
-  if (!value) return null;
-  const time = Date.parse(value);
-  return Number.isFinite(time) ? new Date(time) : null;
-}
-
-function slugDate(value) {
-  const match = String(value || "").match(
-    /(?:^|[-_])((?:202[5-9]|203\d)-\d{2}-\d{2})(?:[-_]|$)/
+function truthyOpen(m) {
+  return (
+    m &&
+    m.active !== false &&
+    m.closed !== true &&
+    m.archived !== true &&
+    m.acceptingOrders !== false &&
+    m.enableOrderBook !== false
   );
-
-  if (!match) return null;
-
-  const date = match[1];
-  const [year, month, day] = date.split("-").map(Number);
-  const check = new Date(Date.UTC(year, month - 1, day));
-
-  if (
-    check.getUTCFullYear() !== year ||
-    check.getUTCMonth() !== month - 1 ||
-    check.getUTCDate() !== day
-  ) return null;
-
-  return date;
 }
 
-function istDateKey(value) {
-  const date = value instanceof Date ? value : validDate(value);
-  if (!date) return null;
+function tokenIds(m) {
+  const ids = arr(m?.clobTokenIds)
+    .map(x => String(x ?? "").trim())
+    .filter(Boolean);
 
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date);
-
-  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
-  return `${p.year}-${p.month}-${p.day}`;
-}
-
-function todayIST() {
-  return istDateKey(new Date());
-}
-
-function shiftDateKey(key, days) {
-  const [y, m, d] = key.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d + days));
+  if (ids.length) return [...new Set(ids)];
 
   return [
-    date.getUTCFullYear(),
-    String(date.getUTCMonth() + 1).padStart(2, "0"),
-    String(date.getUTCDate()).padStart(2, "0")
-  ].join("-");
-}
-
-/*
- * Only explicit match-schedule fields are accepted as kickoff times.
- * event.startDate/endDate are deliberately NOT used as kickoff times.
- */
-function scheduledTime(event) {
-  const fields = [
-    event.scheduledStartTime,
-    event.matchStartTime,
-    event.gameStartTime,
-    event.eventStartTime,
-    event.startTime
+    ...new Set(
+      arr(m?.tokens)
+        .map(t =>
+          String(
+            t?.token_id ??
+            t?.tokenId ??
+            t?.asset_id ??
+            ""
+          ).trim()
+        )
+        .filter(Boolean)
+    )
   ];
-
-  for (const field of fields) {
-    const date = validDate(field);
-    if (date) return date;
-  }
-
-  return null;
 }
 
-function scheduleDate(event, scheduledAt) {
-  if (scheduledAt) return istDateKey(scheduledAt);
-
-  return (
-    slugDate(event.slug) ||
-    slugDate(event.ticker) ||
-    slugDate(event.title)
+function outcomes(m) {
+  return arr(m?.outcomes).map(o =>
+    typeof o === "string"
+      ? o
+      : String(o?.name ?? o?.outcome ?? "")
   );
 }
 
-function isEsports(event) {
-  const parts = [
-    event.title,
-    event.slug,
-    event.ticker,
-    event.sport,
-    event.category,
-    event.series,
-    event.description,
-    ...arr(event.tags).map(str),
-    ...arr(event.markets).flatMap(m => [
-      m.question,
-      m.slug,
-      m.groupItemTitle
-    ])
-  ];
-
-  const value = parts.join(" ").toLowerCase();
-
-  return /\b(counter[\s-]?strike|cs2|csgo|valorant|dota\s*2|league of legends|lol esports|esports|e[- ]sports|rocket league|rainbow six|overwatch|starcraft|call of duty esports|mobile legends|pubg esports|fortnite esports|honor of kings|wild rift)\b/i.test(value);
-}
-
-function sportOf(event) {
-  if (isEsports(event)) return null;
-
-  const tagValues = arr(event.tags).map(t => {
-    if (t && typeof t === "object") {
-      return [
-        t.label,
-        t.name,
-        t.slug,
-        t.value
-      ].map(str).join(" ");
-    }
-    return str(t);
-  });
-
-  const parts = [
-    event.sport,
-    event.category,
-    event.series,
-    event.league,
-    event.title,
-    event.slug,
-    event.ticker,
-    ...tagValues
-  ];
-
-  const value = parts.join(" ").toLowerCase();
-
-  if (/\b(cricket|t20|odi cricket|test cricket|ipl|bbl|psl|wpl|icc|ashes|ranji trophy|county cricket|world test championship)\b/i.test(value)) {
-    return "cricket";
-  }
-
-  if (/\b(tennis|atp|wta|challenger tennis|itf tennis|grand slam|roland garros|french open|wimbledon|us open tennis|australian open tennis|davis cup|billie jean king cup)\b/i.test(value)) {
-    return "tennis";
-  }
-
-  if (/\b(soccer|association football|premier league|champions league|la liga|serie a|bundesliga|ligue 1|mls|epl|uefa|fifa|world cup|europa league|conference league|fa cup|copa america|afcon|international football|football match|football league)\b/i.test(value)) {
-    return "football";
-  }
-
-  return null;
-}
-
-function explicitLive(event) {
-  const fields = [
-    event.live,
-    event.isLive,
-    event.inPlay,
-    event.is_in_play
-  ];
-
-  if (fields.some(truthy)) return true;
-
-  const status = [
-    event.status,
-    event.gameStatus,
-    event.eventStatus
-  ].map(str).join(" ").toLowerCase();
-
-  return /\b(live|in[- ]play|inprogress|in progress)\b/.test(status);
-}
-
-function eventIsActive(event) {
-  return event.active !== false &&
-    event.closed !== true &&
-    event.archived !== true;
-}
-
-function eventIsClosed(event) {
-  return event.closed === true ||
-    event.closed === "true" ||
-    event.archived === true;
-}
-
-function splitTitle(title) {
-  const source = String(title || "").trim();
-  if (!source) return [];
-
-  /*
-   * Some sports titles repeat the matchup after a series prefix.
-   * Prefer the last matchup-like segment.
-   */
-  const segments = source.split(":").map(x => x.trim());
-  let candidate = source;
-
-  for (let i = segments.length - 1; i >= 0; i--) {
-    if (/\b(?:vs\.?|v)\b/i.test(segments[i])) {
-      candidate = segments[i];
-      break;
-    }
-  }
-
-  const pieces = candidate.split(
-    /\s+(?:vs?\.?|versus)\s+/i
+function eventText(e) {
+  const tags = arr(e?.tags).map(t =>
+    typeof t === "string"
+      ? t
+      : [t?.label, t?.slug, t?.name]
+          .filter(Boolean)
+          .join(" ")
   );
 
-  if (pieces.length < 2) return [];
-
-  const clean = value => value
-    .replace(/\s*[-–—]\s*(?:match winner|winner|match result).*$/i, "")
-    .replace(/\s*\((?:bo\d|best of).*$/i, "")
-    .replace(/^\s*(?:match winner|winner):?\s*/i, "")
-    .trim();
-
-  const first = clean(pieces[0]);
-  const second = clean(pieces.slice(1).join(" vs "));
-
-  if (!first || !second) return [];
-
-  return [first, second];
+  return norm(
+    [
+      e?.title,
+      e?.slug,
+      e?.description,
+      e?.ticker,
+      e?.series?.title,
+      ...tags
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
 }
 
-function tokenId(value) {
-  if (typeof value === "string" || typeof value === "number") {
-    const id = String(value).trim();
-    return /^\d{1,120}$/.test(id) ? id : null;
-  }
+function sportOf(e) {
+  const t = eventText(e);
 
-  if (value && typeof value === "object") {
-    return tokenId(
-      value.token_id ??
-      value.tokenId ??
-      value.asset_id ??
-      value.assetId ??
-      value.id
-    );
-  }
-
-  return null;
-}
-
-function marketTokens(market, eventTeams) {
-  const outcomes = arr(market.outcomes).map(str);
-  const ids = arr(
-    market.clobTokenIds ??
-    market.clob_token_ids ??
-    market.tokenIds ??
-    market.token_ids
-  ).map(tokenId);
-
-  if (!outcomes.length || !ids.length) return [];
-
-  const question = str(market.question || market.title);
-  const conditionId = str(market.conditionId || market.condition_id);
-  const tokens = [];
-
-  for (let i = 0; i < Math.min(outcomes.length, ids.length); i++) {
-    const id = ids[i];
-    const label = outcomes[i];
-
-    if (!id || !label) continue;
-
-    let team = label;
-
-    if (/^(yes|no)$/i.test(label)) {
-      const q = question.toLowerCase();
-
-      const matchingTeam = eventTeams.find(name =>
-        name && q.includes(name.toLowerCase())
-      );
-
-      team = matchingTeam || label;
-    }
-
-    tokens.push({
-      id,
-      label,
-      team,
-      conditionId,
-      question
-    });
-  }
-
-  return tokens;
-}
-
-function normalize(event) {
-  const sport = sportOf(event);
-  if (!sport || !ALLOWED.includes(sport)) return null;
-
-  const title = str(event.title || event.name);
-  const teams = splitTitle(title);
-
-  if (teams.length !== 2) return null;
-
-  /*
-   * A duplicated team name is usually malformed event metadata.
-   * Reject rather than inventing a second participant.
-   */
-  if (teams[0].toLowerCase() === teams[1].toLowerCase()) {
+  if (
+    /\b(bitcoin|ethereum|crypto|s&p 500|nasdaq|dow jones|gold price|election|fomc|federal reserve|interest rate|ballon d'or|ballon dor|top scorer award|league winner|season winner|outright)\b/.test(t)
+  ) {
     return null;
   }
 
-  const markets = arr(event.markets);
-  const tokens = [];
-  const seenTokens = new Set();
-
-  for (const market of markets) {
-    if (!market || typeof market !== "object") continue;
-
-    if (
-      market.closed === true ||
-      market.archived === true ||
-      market.active === false
-    ) continue;
-
-    for (const token of marketTokens(market, teams)) {
-      if (seenTokens.has(token.id)) continue;
-      seenTokens.add(token.id);
-      tokens.push(token);
-    }
+  if (
+    /\b(cricket|ipl|t20|odi|test match|big bash|bbl|psl|cpl|the hundred|ranji trophy|wpl|ashes)\b/.test(t)
+  ) {
+    return "cricket";
   }
 
-  if (!tokens.length) return null;
+  if (
+    /\b(tennis|atp|wta|grand slam|wimbledon|roland garros|french open|us open|australian open|challenger)\b/.test(t)
+  ) {
+    return "tennis";
+  }
 
-  const scheduledAt = scheduledTime(event);
-  const scheduledDate = scheduleDate(event, scheduledAt);
-  const live = explicitLive(event);
+  if (
+    /\b(soccer|football|premier league|champions league|europa league|la liga|serie a|bundesliga|ligue 1|mls|fa cup|world cup|epl|uefa|fifa|eredivisie|copa)\b/.test(t)
+  ) {
+    return "soccer";
+  }
+
+  return null;
+}
+
+function matchupTitle(title) {
+  const t = norm(title);
+
+  if (
+    !t ||
+    /\b(outright|champion|championship winner|league winner|season winner|top scorer|relegat|qualify for|tournament winner|mvp|award|price target)\b/.test(t)
+  ) {
+    return false;
+  }
+
+  return /\b(vs\.?|v\.?|versus)\b/i.test(t);
+}
+
+function marketKind(m, eventTitle) {
+  const q = norm(
+    m?.question ??
+    m?.groupItemTitle ??
+    m?.title ??
+    ""
+  );
+
+  const combined = `${norm(eventTitle)} ${q}`;
+
+  const excluded =
+    /\b(total corners?|corners?|over\/under|over or under|\bo\/u\b|totals?|both teams to score|double chance|handicap|spread|player props?|shots?|cards?|yellow cards?|red cards?|sets? handicap|games? handicap|total games?|total sets?|aces|break points|first half|half time|correct score|winning margin|race to|team total|runs? total|wickets?|six(es)?|fours?|top scorer|anytime scorer|first goal|next goal|penalt(y|ies)|to qualify|tournament winner|series winner)\b/;
+
+  if (excluded.test(q)) return null;
+
+  const outs = outcomes(m).map(norm);
+  const ids = tokenIds(m);
+
+  if (ids.length < 2) return null;
+  if (!truthyOpen(m)) return null;
+
+  const winnerWords =
+    /\b(winner|to win|win the match|match winner|moneyline|match result|result of the match|will .* win)\b/.test(q);
+
+  const neutralMatchQuestion =
+    q === norm(eventTitle) ||
+    q === "" ||
+    /\b(vs\.?|v\.?|versus)\b/.test(q);
+
+  const yesNo =
+    outs.length === 2 &&
+    outs.includes("yes") &&
+    outs.includes("no");
+
+  if (yesNo) return null;
+  if (outs.length < 2) return null;
+
+  if (winnerWords || neutralMatchQuestion) {
+    return {
+      kind: "winner",
+      score: winnerWords ? 10 : 8
+    };
+  }
+
+  if (
+    outs.length === 2 &&
+    /\b(vs\.?|v\.?|versus)\b/.test(combined) &&
+    !excluded.test(combined)
+  ) {
+    return {
+      kind: "winner",
+      score: 5
+    };
+  }
+
+  return null;
+}
+
+function normaliseMarket(m, event) {
+  const ids = tokenIds(m);
+  const names = outcomes(m);
+
+  if (ids.length < 2 || names.length < 2) return null;
+
+  const tokens = ids.map((id, i) => ({
+    id,
+    name: names[i] || `Outcome ${i + 1}`
+  }));
+
+  const question = String(
+    m.question ??
+    m.groupItemTitle ??
+    event.title ??
+    "Match winner"
+  );
 
   return {
-    id: str(event.id),
-    title,
-    slug: str(event.slug),
-    sport,
-    teams,
-    scheduledAt: scheduledAt ? scheduledAt.toISOString() : null,
-    scheduledDate,
-    scheduleSource: scheduledAt ? "explicit" : (scheduledDate ? "slug-date-only" : null),
-    live,
-    active: eventIsActive(event),
-    closed: eventIsClosed(event),
+    id: String(m.id ?? ""),
+    question,
+    slug: m.slug ?? null,
+
+    active: m.active !== false,
+    closed: m.closed === true,
+
+    acceptingOrders: m.acceptingOrders ?? null,
+    enableOrderBook: m.enableOrderBook ?? null,
+
+    outcomes: names,
+    outcomePrices: arr(m.outcomePrices),
+    clobTokenIds: ids,
     tokens,
-    marketCount: markets.length,
-    url: event.slug
-      ? `https://polymarket.com/event/${encodeURIComponent(event.slug)}`
+
+    bestBid: m.bestBid ?? null,
+    bestAsk: m.bestAsk ?? null,
+
+    liquidity:
+      Number(m.liquidityNum ?? m.liquidity ?? 0) || 0,
+
+    volume:
+      Number(m.volumeNum ?? m.volume ?? 0) || 0,
+
+    marketUrl: m.slug
+      ? `https://polymarket.com/event/${event.slug}/${m.slug}`
       : null
   };
 }
 
-async function getJson(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+function eventSummary(e) {
+  const sport = sportOf(e);
+  const title = String(e.title ?? e.question ?? "");
 
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json"
-      },
-      signal: controller.signal
-    });
-
-    const raw = await response.text();
-
-    if (!response.ok) {
-      throw new Error(`Upstream HTTP ${response.status}: ${raw.slice(0, 200)}`);
-    }
-
-    try {
-      return JSON.parse(raw);
-    } catch {
-      throw new Error("Upstream returned invalid JSON");
-    }
-  } finally {
-    clearTimeout(timer);
+  if (
+    !sport ||
+    !matchupTitle(title) ||
+    e.active === false ||
+    e.closed === true ||
+    e.archived === true
+  ) {
+    return null;
   }
-}
 
-async function fetchEvents() {
-  const all = [];
-  const seen = new Set();
-  let pagesScanned = 0;
+  const rawMarkets = arr(e.markets);
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const offset = page * PAGE_SIZE;
+  const ranked = rawMarkets
+    .map(m => ({
+      m,
+      k: marketKind(m, title)
+    }))
+    .filter(x => x.k);
 
-    const params = new URLSearchParams({
-      active: "true",
-      closed: "false",
-      limit: String(PAGE_SIZE),
-      offset: String(offset),
-      order: "startDate",
-      ascending: "false"
-    });
+  ranked.sort(
+    (a, b) =>
+      b.k.score - a.k.score ||
+      (
+        Number(b.m.liquidityNum ?? b.m.liquidity ?? 0) -
+        Number(a.m.liquidityNum ?? a.m.liquidity ?? 0)
+      )
+  );
 
-    const result = await getJson(`${GAMMA}/events?${params}`);
-    const rows = Array.isArray(result)
-      ? result
-      : Array.isArray(result?.data)
-        ? result.data
-        : [];
+  if (!ranked.length) return null;
 
-    pagesScanned++;
+  const primary = normaliseMarket(ranked[0].m, e);
 
-    if (!rows.length) break;
+  if (!primary) return null;
 
-    for (const event of rows) {
-      const id = str(event?.id);
-      const slug = str(event?.slug);
-      const key = id || slug;
+  const now = Date.now();
 
-      if (!key || seen.has(key)) continue;
+  const start = Date.parse(
+    e.startDate ?? e.start_date ?? ""
+  );
 
-      seen.add(key);
-      all.push(event);
-    }
+  const end = Date.parse(
+    e.endDate ?? e.end_date ?? ""
+  );
 
-    if (rows.length < PAGE_SIZE) break;
+  const explicitLive =
+    e.live === true ||
+    e.isLive === true ||
+    /^(inprogress|in_progress|live|break|halftime)$/i.test(
+      String(e.status ?? "")
+    );
+
+  if (Number.isFinite(end) && end < now) return null;
+
+  if (
+    Number.isFinite(start) &&
+    start < now - 36 * 60 * 60 * 1000 &&
+    !explicitLive
+  ) {
+    return null;
   }
+
+  const fancyMarkets = rawMarkets
+    .map(m => normaliseMarket(m, e))
+    .filter(Boolean)
+    .filter(m => m.id !== primary.id)
+    .slice(0, 30);
 
   return {
-    events: all,
-    pagesScanned
+    id: String(e.id ?? e.slug ?? ""),
+    eventId: String(e.id ?? ""),
+    title,
+    slug: String(e.slug ?? ""),
+    sport,
+
+    startDate: e.startDate ?? e.start_date ?? null,
+    endDate: e.endDate ?? e.end_date ?? null,
+
+    active: e.active !== false,
+    closed: e.closed === true,
+
+    live: explicitLive,
+    status: e.status ?? null,
+
+    eventUrl: e.slug
+      ? `https://polymarket.com/event/${e.slug}`
+      : null,
+
+    marketQuestion: primary.question,
+    marketId: primary.id,
+    marketUrl: primary.marketUrl,
+
+    tokens: primary.tokens,
+    clobTokenIds: primary.clobTokenIds,
+    outcomes: primary.outcomes,
+
+    marketCount: 1 + fancyMarkets.length,
+
+    fancyMarkets: fancyMarkets.map(m => ({
+      id: m.id,
+      question: m.question,
+      slug: m.slug,
+      tokens: m.tokens,
+      clobTokenIds: m.clobTokenIds,
+      outcomes: m.outcomes,
+      marketUrl: m.marketUrl
+    })),
+
+    updatedAt: new Date().toISOString()
   };
 }
 
-function parseBoolParam(value) {
-  return value === "1" || value === "true" || value === "yes";
-}
+async function fetchPage(offset, sport) {
+  const u = new URL(`${GAMMA}/events`);
 
-function dayFilterFor(url) {
-  const raw = (
-    url.searchParams.get("day") ||
-    url.searchParams.get("date") ||
-    url.searchParams.get("filter") ||
-    ""
-  ).toLowerCase();
+  u.searchParams.set("active", "true");
+  u.searchParams.set("closed", "false");
+  u.searchParams.set("limit", String(PAGE_SIZE));
+  u.searchParams.set("offset", String(offset));
+  u.searchParams.set("order", "startDate");
+  u.searchParams.set("ascending", "true");
 
-  if (["today", "tomorrow", "live", "upcoming", "all"].includes(raw)) {
-    return raw;
-  }
+  const tag = sport === "soccer" ? "soccer" : sport;
 
-  if (parseBoolParam(url.searchParams.get("live"))) {
-    return "live";
-  }
+  u.searchParams.set("tag_slug", tag);
+  u.searchParams.set("include_tag", "true");
 
-  return "upcoming";
-}
-
-function dateMatches(match, day) {
-  const today = todayIST();
-  const tomorrow = shiftDateKey(today, 1);
-  const key = match.scheduledDate;
-
-  if (day === "live") return match.live;
-  if (match.live) return true;
-
-  if (!key) return false;
-
-  if (day === "today") return key === today;
-  if (day === "tomorrow") return key === tomorrow;
-  if (day === "upcoming") return key >= today;
-
-  return key >= today;
-}
-
-function normalizeLimit(value, fallback = 100) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(1, Math.min(100, Math.floor(parsed)));
-}
-
-async function handle(request) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: HEADERS
-    });
-  }
-
-  if (request.method !== "GET") {
-    return reply({
-      success: false,
-      error: "method_not_allowed"
-    }, 405);
-  }
-
-  const url = new URL(request.url);
-  const path = url.pathname.replace(/\/+$/, "") || "/";
-
-  if (path === "/health") {
-    return reply({
-      success: true,
-      status: "ok",
-      worker: "crystal-live-odds",
-      source: "Polymarket Gamma + public CLOB",
-      allowedSports: ALLOWED,
-      todayIST: todayIST(),
-      endpoints: [
-        "/health",
-        "/sports",
-        "/matches?sport=all&limit=100&offset=0",
-        "/event?id=EVENT_ID",
-        "/price?token_id=TOKEN_ID&side=BUY",
-        "/book?token_id=TOKEN_ID"
-      ]
-    });
-  }
-
-  if (path === "/sports") {
-    return reply({
-      success: true,
-      sports: [
-        { id: "cricket", label: "Cricket" },
-        { id: "tennis", label: "Tennis" },
-        { id: "football", label: "Football" }
-      ]
-    });
-  }
-
-  if (path === "/price") {
-    const id = url.searchParams.get("token_id") || "";
-    const side = (url.searchParams.get("side") || "BUY").toUpperCase();
-
-    if (!/^\d{1,120}$/.test(id)) {
-      return reply({ success: false, error: "invalid_token_id" }, 400);
+  const r = await fetch(u.toString(), {
+    headers: {
+      Accept: "application/json"
+    },
+    cf: {
+      cacheTtl: 0
     }
+  });
 
-    if (!["BUY", "SELL"].includes(side)) {
-      return reply({ success: false, error: "invalid_side" }, 400);
-    }
+  if (!r.ok) {
+    throw new Error(
+      `Gamma HTTP ${r.status} (${sport}, offset ${offset})`
+    );
+  }
 
-    const params = new URLSearchParams({
-      token_id: id,
-      side
-    });
+  const d = await r.json();
 
-    const data = await getJson(`${CLOB}/price?${params}`);
-    const price = Number(data?.price);
+  return Array.isArray(d) ? d : [];
+}
 
-    if (!Number.isFinite(price) || price <= 0 || price > 1) {
-      return reply({
-        success: true,
-        tokenId: id,
-        side,
-        price: null,
-        cents: null,
-        decimalOdds: null,
-        source: "public CLOB"
+async function scan() {
+  const jobs = [];
+
+  for (const sport of ALLOWED_SPORTS) {
+    for (let p = 0; p < MAX_PAGES_PER_SPORT; p++) {
+      jobs.push({
+        sport,
+        offset: p * PAGE_SIZE
       });
     }
-
-    return reply({
-      success: true,
-      tokenId: id,
-      side,
-      price,
-      cents: price * 100,
-      decimalOdds: 1 / price,
-      timestamp: new Date().toISOString(),
-      source: "public CLOB"
-    });
   }
 
-  if (path === "/book") {
-    const id = url.searchParams.get("token_id") || "";
+  const results = await Promise.allSettled(
+    jobs.map(j => fetchPage(j.offset, j.sport))
+  );
 
-    if (!/^\d{1,120}$/.test(id)) {
-      return reply({ success: false, error: "invalid_token_id" }, 400);
-    }
+  const raw = new Map();
+  const errors = [];
 
-    const params = new URLSearchParams({ token_id: id });
-    const data = await getJson(`${CLOB}/book?${params}`);
-
-    return reply({
-      success: true,
-      tokenId: id,
-      book: data
-    });
-  }
-
-  if (path === "/event") {
-    const id = url.searchParams.get("id") || "";
-
-    if (!id || id.length > 200) {
-      return reply({ success: false, error: "missing_or_invalid_event_id" }, 400);
-    }
-
-    const params = new URLSearchParams({ id });
-    const data = await getJson(`${GAMMA}/events?${params}`);
-
-    const rows = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.data)
-        ? data.data
-        : data && typeof data === "object"
-          ? [data]
-          : [];
-
-    const event = rows.find(item => str(item.id) === id);
-
-    if (!event) {
-      return reply({
-        success: false,
-        error: "event_not_found",
-        id
-      }, 404);
-    }
-
-    return reply({
-      success: true,
-      event: normalize(event),
-      raw: event
-    });
-  }
-
-  if (path === "/matches") {
-    const sportParam = (
-      url.searchParams.get("sport") || "all"
-    ).toLowerCase();
-
-    if (sportParam !== "all" && !ALLOWED.includes(sportParam)) {
-      return reply({
-        success: false,
-        error: "unsupported_sport",
-        allowedSports: ALLOWED
-      }, 400);
-    }
-
-    const limit = normalizeLimit(url.searchParams.get("limit"), 100);
-    const offset = Math.max(
-      0,
-      Math.min(100000, Number(url.searchParams.get("offset")) || 0)
-    );
-
-    const query = (
-      url.searchParams.get("q") ||
-      url.searchParams.get("search") ||
-      ""
-    ).trim().toLowerCase();
-
-    const day = dayFilterFor(url);
-
-    const { events, pagesScanned } = await fetchEvents();
-
-    const matches = [];
-    const seen = new Set();
-
-    for (const event of events) {
-      if (!eventIsActive(event)) continue;
-
-      const match = normalize(event);
-      if (!match) continue;
-
-      if (sportParam !== "all" && match.sport !== sportParam) {
-        continue;
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      for (const e of r.value) {
+        if (e?.id != null) {
+          raw.set(String(e.id), e);
+        }
       }
-
-      if (query) {
-        const haystack = [
-          match.title,
-          match.slug,
-          match.sport,
-          ...match.teams
-        ].join(" ").toLowerCase();
-
-        if (!haystack.includes(query)) continue;
-      }
-
-      if (!dateMatches(match, day)) continue;
-
-      const key = match.id || match.slug;
-      if (!key || seen.has(key)) continue;
-
-      seen.add(key);
-      matches.push(match);
+    } else {
+      errors.push({
+        sport: jobs[i].sport,
+        offset: jobs[i].offset,
+        error: String(r.reason?.message ?? r.reason)
+      });
     }
+  });
 
-    matches.sort((a, b) => {
-      if (a.live !== b.live) return a.live ? -1 : 1;
+  const rows = [...raw.values()]
+    .map(eventSummary)
+    .filter(Boolean);
 
-      const da = a.scheduledDate || "9999-99-99";
-      const db = b.scheduledDate || "9999-99-99";
+  const unique = new Map(
+    rows.map(x => [x.id, x])
+  );
 
-      if (da !== db) return da.localeCompare(db);
+  const data = [...unique.values()].sort(
+    (a, b) =>
+      (Date.parse(a.startDate) || Infinity) -
+      (Date.parse(b.startDate) || Infinity)
+  );
 
-      const ta = a.scheduledAt ? Date.parse(a.scheduledAt) : Infinity;
-      const tb = b.scheduledAt ? Date.parse(b.scheduledAt) : Infinity;
+  return {
+    data,
+    scannedEvents: [...raw.values()].length,
+    uniqueEvents: raw.size,
+    errors,
+    fetchedAt: new Date().toISOString()
+  };
+}
 
-      return ta - tb;
-    });
-
-    const page = matches.slice(offset, offset + limit);
-
-    return reply({
-      success: true,
-      worker: "crystal-live-odds",
-      source: "Polymarket Gamma + public CLOB",
-      sport: sportParam,
-      day,
-      todayIST: todayIST(),
-      count: page.length,
-      total: matches.length,
-      offset,
-      limit,
-      hasMore: offset + page.length < matches.length,
-      pagesScanned,
-      eventsScanned: events.length,
-      data: page
-    });
+async function getData(force = false) {
+  if (
+    !force &&
+    CACHE.value &&
+    Date.now() - CACHE.at < CACHE_TTL_MS
+  ) {
+    return CACHE.value;
   }
 
-  return reply({
-    success: false,
-    error: "not_found",
-    path,
-    availableEndpoints: [
-      "/health",
-      "/sports",
-      "/matches",
-      "/event?id=EVENT_ID",
-      "/price?token_id=TOKEN_ID&side=BUY",
-      "/book?token_id=TOKEN_ID"
-    ]
-  }, 404);
+  if (!force && CACHE.pending) {
+    return CACHE.pending;
+  }
+
+  CACHE.pending = scan()
+    .then(v => {
+      CACHE.value = v;
+      CACHE.at = Date.now();
+      return v;
+    })
+    .finally(() => {
+      CACHE.pending = null;
+    });
+
+  return CACHE.pending;
+}
+
+async function fetchEvent(id) {
+  const u = new URL(`${GAMMA}/events`);
+
+  u.searchParams.set("id", id);
+
+  const r = await fetch(u.toString(), {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+
+  if (!r.ok) {
+    throw new Error(`Gamma HTTP ${r.status}`);
+  }
+
+  const d = await r.json();
+
+  return Array.isArray(d)
+    ? d.find(e => String(e.id) === id) ?? null
+    : d;
 }
 
 export default {
-  async fetch(request) {
-    try {
-      return await handle(request);
-    } catch (error) {
-      return reply({
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    const path =
+      url.pathname.replace(/\/+$/, "") || "/";
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: HEADERS
+      });
+    }
+
+    // VPS WebSocket relay
+    if (path === "/ws") {
+      if (
+        request.headers.get("Upgrade")?.toLowerCase() !==
+        "websocket"
+      ) {
+        return json({
+          success: false,
+          error: "WebSocket upgrade required"
+        }, 426);
+      }
+
+      if (!env.BRIDGE_URL || !env.BRIDGE_TOKEN) {
+        return json({
+          success: false,
+          error: "BRIDGE_URL or BRIDGE_TOKEN is not configured"
+        }, 503);
+      }
+
+      try {
+        const upstream = await fetch(env.BRIDGE_URL, {
+          headers: {
+            Upgrade: "websocket",
+            Authorization: `Bearer ${env.BRIDGE_TOKEN}`
+          }
+        });
+
+        if (
+          upstream.status !== 101 ||
+          !upstream.webSocket
+        ) {
+          return json({
+            success: false,
+            error: "VPS bridge rejected WebSocket",
+            upstreamStatus: upstream.status
+          }, 502);
+        }
+
+        const pair = new WebSocketPair();
+
+        const client = pair[0];
+        const server = pair[1];
+        const remote = upstream.webSocket;
+
+        server.accept();
+        remote.accept();
+
+        const relay = (from, to) => {
+          from.addEventListener("message", event => {
+            try {
+              to.send(event.data);
+            } catch {}
+          });
+
+          from.addEventListener("close", event => {
+            try {
+              to.close(
+                event.code || 1000,
+                event.reason || "closed"
+              );
+            } catch {}
+          });
+
+          from.addEventListener("error", () => {
+            try {
+              to.close(1011, "relay error");
+            } catch {}
+          });
+        };
+
+        relay(server, remote);
+        relay(remote, server);
+
+        return new Response(null, {
+          status: 101,
+          webSocket: client
+        });
+
+      } catch (e) {
+        return json({
+          success: false,
+          error: "VPS WebSocket relay failed",
+          details: String(e?.message ?? e)
+        }, 502);
+      }
+    }
+
+    if (request.method !== "GET") {
+      return json({
         success: false,
-        worker: "crystal-live-odds",
-        error: error?.name === "AbortError"
-          ? "upstream_timeout"
-          : "upstream_error",
-        message: String(error?.message || error).slice(0, 300)
+        error: "GET only"
+      }, 405);
+    }
+
+    try {
+      if (path === "/" || path === "/health") {
+        return json({
+          success: true,
+          status: "ok",
+          worker: "crystal-live-odds",
+          source: "Polymarket Gamma + authenticated VPS CLOB WebSocket relay",
+          allowedSports: ALLOWED_SPORTS,
+          pageSize: PAGE_SIZE,
+          maxPagesPerSport: MAX_PAGES_PER_SPORT,
+          endpoints: [
+            "/health",
+            "/sports",
+            "/matches?sport=all&limit=100&offset=0",
+            "/event?id=EVENT_ID",
+            "/ws"
+          ],
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      if (path === "/sports") {
+        return json({
+          success: true,
+          sports: ALLOWED_SPORTS
+        });
+      }
+
+      if (path === "/event") {
+        const id = url.searchParams.get("id");
+
+        if (!id) {
+          return json({
+            success: false,
+            error: "Missing id"
+          }, 400);
+        }
+
+        const e = await fetchEvent(id);
+        const row = e ? eventSummary(e) : null;
+
+        return row
+          ? json({
+              success: true,
+              data: row
+            })
+          : json({
+              success: false,
+              error: "Eligible open head-to-head market not found"
+            }, 404);
+      }
+
+      if (path === "/matches" || path === "/events") {
+        const sportRaw = norm(
+          url.searchParams.get("sport") || "all"
+        );
+
+        const sport =
+          sportRaw === "football"
+            ? "soccer"
+            : sportRaw;
+
+        if (
+          sport !== "all" &&
+          !ALLOWED_SPORTS.includes(sport)
+        ) {
+          return json({
+            success: false,
+            error: `Unsupported sport. Use all, ${ALLOWED_SPORTS.join(", ")}`,
+            allowedSports: ALLOWED_SPORTS
+          }, 400);
+        }
+
+        const limit = Math.min(
+          200,
+          Math.max(
+            1,
+            Number.parseInt(
+              url.searchParams.get("limit") || "100",
+              10
+            ) || 100
+          )
+        );
+
+        const offset = Math.max(
+          0,
+          Number.parseInt(
+            url.searchParams.get("offset") || "0",
+            10
+          ) || 0
+        );
+
+        const force =
+          url.searchParams.get("refresh") === "1";
+
+        const result = await getData(force);
+
+        const filtered = result.data.filter(
+          x => sport === "all" || x.sport === sport
+        );
+
+        return json({
+          success: true,
+          worker: "crystal-live-odds",
+          source: "Polymarket Gamma",
+          sport,
+          count: filtered.length,
+          total: filtered.length,
+          scannedEvents: result.scannedEvents,
+          uniqueEvents: result.uniqueEvents,
+          offset,
+          limit,
+          hasMore: offset + limit < filtered.length,
+          fetchedAt: result.fetchedAt,
+          scanErrors: result.errors.slice(0, 8),
+          data: filtered.slice(offset, offset + limit)
+        });
+      }
+
+      return json({
+        success: false,
+        error: "Not found",
+        endpoints: [
+          "/health",
+          "/sports",
+          "/matches",
+          "/event"
+        ]
+      }, 404);
+
+    } catch (e) {
+      return json({
+        success: false,
+        error: String(e?.message ?? e),
+        timestamp: new Date().toISOString()
       }, 502);
     }
   }
 };
-
