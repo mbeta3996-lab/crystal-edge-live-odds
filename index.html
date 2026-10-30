@@ -1,1183 +1,568 @@
-
-
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-
 <meta name="theme-color" content="#ffffff">
-
 <title>CRYSTAL EDGE — Polymarket Live Sports</title>
-
 <style>
-
 :root{color-scheme:light;--bg:#fff;--fg:#111;--muted:#686868;--line:#e5e5e5;--soft:#f6f6f6;--good:#167444;--bad:#b42318}
-
 *{box-sizing:border-box}
-
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-
 body{padding:env(safe-area-inset-top) 12px calc(22px + env(safe-area-inset-bottom));font-size:14px}
-
-button,input{font:inherit}
-
-button{color:inherit;background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;cursor:pointer}
-
-button:active{background:#eee}
-
-button:disabled{opacity:.45}
-
+button,input{font:inherit}button{color:inherit;background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;cursor:pointer}button:active{background:#eee}button:disabled{opacity:.45}
 header{max-width:950px;margin:0 auto;padding:15px 0 12px;border-bottom:1px solid var(--line)}
-
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
-
-.brand{font-size:20px;font-weight:850;letter-spacing:.7px}
-
-.sub{font-size:10px;letter-spacing:1.4px;color:var(--muted);margin-top:4px}
-
-.statusline{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-
-.pill{border:1px solid var(--line);border-radius:30px;padding:5px 8px;color:var(--muted);font-size:11px}
-
-.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#999;margin-right:5px}
-
-.dot.ok{background:#16834a}.dot.bad{background:#b42318}
-
-main{max-width:950px;margin:0 auto}
-
-.searchrow{display:flex;gap:8px;margin:13px 0}
-
-#search{min-width:0;flex:1;border:1px solid var(--line);border-radius:9px;padding:11px;background:#fff;color:#111}
-
-.sports,.filters{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
-
-.sports::-webkit-scrollbar,.filters::-webkit-scrollbar{display:none}
-
-.sportbtn{min-width:43px;font-size:18px;padding:8px 12px}
-
-.activebtn{background:#111;color:#fff;border-color:#111}
-
-.filters button{white-space:nowrap;font-size:12px}
-
-.toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 10px}
-
-.small{font-size:11px;color:var(--muted)}
-
-#cards{display:grid;grid-template-columns:1fr;gap:10px}
-
-.card{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;min-width:0}
-
-.cardhead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
-
-.matchtitle{font-size:15px;font-weight:750;line-height:1.35;overflow-wrap:anywhere}
-
-.meta{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}
-
-.liveflag{display:inline-flex;align-items:center;gap:5px;font-size:10px;border:1px solid var(--line);padding:4px 6px;border-radius:30px;white-space:nowrap}
-
-.marketrow{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:12px}
-
-.marketname{font-weight:650;font-size:12px;min-width:0;overflow-wrap:anywhere}
-
-.marketvolume{font-size:10px;color:var(--muted);white-space:nowrap}
-
-.outcomes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}
-
-.outcome{border:1px solid var(--line);border-radius:9px;padding:9px;min-width:0}
-
-.outname{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-.quotegrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-
-.quote{background:var(--soft);border-radius:7px;padding:7px}
-
-.qlabel{font-size:10px;color:var(--muted)}
-
-.price{font-size:17px;font-weight:800;margin-top:3px}
-
-.decimal{font-size:11px;color:var(--muted);margin-top:2px}
-
-.nodata{font-size:11px;color:var(--muted);padding:6px 0}
-
-.cardfoot{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}
-
-.textlink{border:0;padding:0;text-decoration:underline;background:transparent;font-size:11px}
-
-.empty{padding:32px 14px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px;line-height:1.6}
-
-#error{display:none;color:var(--bad);font-size:12px;margin:8px 0;overflow-wrap:anywhere}
-
-#modal{position:fixed;inset:0;background:#0005;display:none;align-items:flex-end;justify-content:center;z-index:9;padding:10px}
-
-#modal.show{display:flex}
-
-.sheet{background:#fff;border-radius:16px 16px 10px 10px;width:min(100%,650px);max-height:82vh;overflow:auto;padding:16px}
-
-.sheethead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
-
-.sheettitle{font-size:17px;font-weight:800}
-
-.marketitem{padding:12px 0;border-top:1px solid var(--line)}
-
-.marketitem strong{display:block;font-size:13px}
-
-.marketitem .small{margin-top:5px;line-height:1.5}
-
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-size:20px;font-weight:850;letter-spacing:.7px}.sub{font-size:10px;letter-spacing:1.4px;color:var(--muted);margin-top:4px}
+.statusline{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.pill{border:1px solid var(--line);border-radius:30px;padding:5px 8px;color:var(--muted);font-size:11px}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#999;margin-right:5px}.dot.ok{background:#16834a}.dot.bad{background:#b42318}
+main{max-width:950px;margin:0 auto}.searchrow{display:flex;gap:8px;margin:13px 0}#search{min-width:0;flex:1;border:1px solid var(--line);border-radius:9px;padding:11px;background:#fff;color:#111}
+.sports,.filters{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}.sports::-webkit-scrollbar,.filters::-webkit-scrollbar{display:none}.sportbtn{min-width:43px;font-size:18px;padding:8px 12px}.activebtn{background:#111;color:#fff;border-color:#111}.filters button{white-space:nowrap;font-size:12px}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 10px}.small{font-size:11px;color:var(--muted)}
+#cards{display:grid;grid-template-columns:1fr;gap:10px}.card{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;min-width:0}.cardhead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.matchtitle{font-size:15px;font-weight:750;line-height:1.35;overflow-wrap:anywhere}.meta{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}
+.liveflag{display:inline-flex;align-items:center;gap:5px;font-size:10px;border:1px solid var(--line);padding:4px 6px;border-radius:30px;white-space:nowrap}.marketrow{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:12px}.marketname{font-weight:650;font-size:12px;min-width:0;overflow-wrap:anywhere}.marketvolume{font-size:10px;color:var(--muted);white-space:nowrap}
+.outcomes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}.outcome{border:1px solid var(--line);border-radius:9px;padding:9px;min-width:0}.outname{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.quotegrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.quote{background:var(--soft);border-radius:7px;padding:7px}.qlabel{font-size:10px;color:var(--muted)}.price{font-size:17px;font-weight:800;margin-top:3px}.decimal{font-size:11px;color:var(--muted);margin-top:2px}.nodata{font-size:11px;color:var(--muted);padding:6px 0}
+.cardfoot{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}.textlink{border:0;padding:0;text-decoration:underline;background:transparent;font-size:11px}
+.empty{padding:32px 14px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px;line-height:1.6}#error{display:none;color:var(--bad);font-size:12px;margin:8px 0;overflow-wrap:anywhere}
+#modal{position:fixed;inset:0;background:#0005;display:none;align-items:flex-end;justify-content:center;z-index:9;padding:10px}#modal.show{display:flex}.sheet{background:#fff;border-radius:16px 16px 10px 10px;width:min(100%,650px);max-height:82vh;overflow:auto;padding:16px}.sheethead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}.sheettitle{font-size:17px;font-weight:800}.marketitem{padding:12px 0;border-top:1px solid var(--line)}.marketitem strong{display:block;font-size:13px}.marketitem .small{margin-top:5px;line-height:1.5}
 footer{max-width:950px;margin:20px auto 0;border-top:1px solid var(--line);padding-top:10px;color:var(--muted);font-size:10px;line-height:1.7}
-
 @media(min-width:680px){#cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
-
 </style>
-
 </head>
-
 <body>
-
 <header>
-
-  <div class="top">
-
-    <div>
-
-      <div class="brand">◇ CRYSTAL EDGE</div>
-
-      <div class="sub">POLYMARKET · LIVE SPORTS</div>
-
-    </div>
-
-    <button id="refresh" type="button">↻ Refresh</button>
-
-  </div>
-
+  <div class="top"><div><div class="brand">◇ CRYSTAL EDGE</div><div class="sub">POLYMARKET · LIVE SPORTS</div></div><button id="refresh" type="button">↻ Refresh</button></div>
   <div class="statusline">
-
     <span class="pill"><span id="wsdot" class="dot"></span><span id="wsstatus">WS CONNECTING</span></span>
-
     <span class="pill">Matches <b id="matchcount">0</b></span>
-
     <span class="pill">Tokens <b id="tokencount">0</b></span>
-
     <span class="pill">Packets <b id="packets">0</b></span>
-
     <span class="pill">Last <b id="lastupdate">—</b></span>
-
   </div>
-
 </header>
-
 <main>
-
-  <div class="searchrow">
-
-    <input id="search" type="search" placeholder="Search teams, match, market…" autocomplete="off">
-
-    <button id="clearsearch" type="button">Clear</button>
-
-  </div>
-
+  <div class="searchrow"><input id="search" type="search" placeholder="Search teams, match, market…" autocomplete="off"><button id="clearsearch" type="button">Clear</button></div>
   <div class="sports" id="sports">
-
     <button class="sportbtn activebtn" data-sport="all" aria-label="All sports" title="All sports">◎</button>
-
     <button class="sportbtn" data-sport="cricket" aria-label="Cricket" title="Cricket">🏏</button>
-
     <button class="sportbtn" data-sport="tennis" aria-label="Tennis" title="Tennis">🎾</button>
-
     <button class="sportbtn" data-sport="football" aria-label="Football" title="Football">⚽</button>
-
   </div>
-
   <div class="filters" id="filters">
-
-    <button class="activebtn" data-day="all">All</button>
-
-    <button data-day="live">Live</button>
-
-    <button data-day="today">Today</button>
-
-    <button data-day="tomorrow">Tomorrow</button>
-
-    <button data-day="upcoming">Upcoming</button>
-
+    <button class="activebtn" data-day="all">All</button><button data-day="live">Live</button><button data-day="today">Today</button><button data-day="tomorrow">Tomorrow</button><button data-day="upcoming">Upcoming</button>
   </div>
-
-  <div class="toolbar">
-
-    <span class="small" id="summary">Loading Polymarket events…</span>
-
-    <span class="small" id="latency">API — · WS —</span>
-
-  </div>
-
-  <div id="error"></div>
-
-  <div id="cards"><div class="empty">Loading matches…</div></div>
-
+  <div class="toolbar"><span class="small" id="summary">Loading Polymarket events…</span><span class="small" id="latency">API — · WS —</span></div>
+  <div id="error"></div><div id="cards"><div class="empty">Loading matches…</div></div>
 </main>
-
-<div id="modal">
-
-  <div class="sheet">
-
-    <div class="sheethead">
-
-      <div class="sheettitle" id="sheettitle">Available markets</div>
-
-      <button id="closemodal" type="button">Close</button>
-
-    </div>
-
-    <div id="marketlist"></div>
-
-  </div>
-
-</div>
-
-<footer>
-
-  Prices come from the public Polymarket CLOB market WebSocket. No quote is invented when the book has no price.
-
-  Decimal odds are calculated as 1 ÷ price. Market availability and live status depend on the data supplied by Polymarket.
-
-  <div id="diagnostics">Waiting for data.</div>
-
-</footer>
+<div id="modal"><div class="sheet"><div class="sheethead"><div class="sheettitle" id="sheettitle">Available markets</div><button id="closemodal" type="button">Close</button></div><div id="marketlist"></div></div></div>
+<footer>Prices come from the public Polymarket CLOB market WebSocket. No quote is invented when the book has no price. Decimal odds are calculated as 1 ÷ price. Market availability and live status depend on the data supplied by Polymarket.<div id="diagnostics">Waiting for data.</div></footer>
 
 <script>
-
 (() => {
-
 "use strict";
 
 const WORKER = "https://crystal-live-odds.mbeta3996.workers.dev";
-
 const CLOB_WS = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
-
 const REFRESH_MS = 60000;
-
 const MAX_TOKENS = 500;
-
 const $ = id => document.getElementById(id);
 
 const state = {
-
-  matches: [],
-
-  sport: "all",
-
-  day: "all",
-
-  search: "",
-
-  ws: null,
-
-  wsConnected: false,
-
-  wsGeneration: 0,
-
-  tokens: new Map(),
-
-  quotes: new Map(),
-
-  packets: 0,
-
-  lastPacketAt: 0,
-
-  apiMs: null,
-
-  wsOpenedAt: null,
-
-  requestAt: null,
-
-  renderAt: null,
-
-  timer: null,
-
-  reconnectTimer: null,
-
-  searchTimer: null,
-
-  modalMatch: null
-
+  matches:[], sport:"all", day:"all", search:"", ws:null, wsConnected:false,
+  wsGeneration:0, wsSignature:"", tokens:new Map(), quotes:new Map(), packets:0,
+  lastPacketAt:0, apiMs:null, wsOpenedAt:null, requestAt:null, renderAt:null,
+  timer:null, reconnectTimer:null, searchTimer:null, modalMatch:null
 };
 
 function escapeHTML(value) {
-
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
-
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-
   })[ch]);
-
 }
-
 function safeNumber(value) {
-
   const n = Number(value);
-
   return Number.isFinite(n) ? n : null;
-
 }
-
 function parseDate(value) {
-
   if (!value) return null;
-
   const d = new Date(value);
-
   return Number.isNaN(d.getTime()) ? null : d;
-
 }
-
 function istKey(value) {
-
   const d = value instanceof Date ? value : new Date(value);
-
   if (Number.isNaN(d.getTime())) return "";
-
-  const parts = new Intl.DateTimeFormat("en-CA", {
-
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"
-
   }).format(d);
-
-  return parts;
-
 }
-
 function formatDate(value) {
-
   const d = parseDate(value);
-
   if (!d) return "Schedule unavailable";
-
   return new Intl.DateTimeFormat("en-IN", {
-
-    timeZone:"Asia/Kolkata",
-
-    day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",
-
-    hour12:true
-
+    timeZone:"Asia/Kolkata",day:"2-digit",month:"short",
+    hour:"2-digit",minute:"2-digit",hour12:true
   }).format(d) + " IST";
-
 }
-
 function money(value) {
-
   if (!Number.isFinite(Number(value))) return "—";
-
-  return "$" + Number(value).toLocaleString("en-US", {
-
-    maximumFractionDigits:0
-
-  });
-
+  return "$" + Number(value).toLocaleString("en-US",{maximumFractionDigits:0});
 }
-
 function priceText(price) {
-
   if (!Number.isFinite(price) || price <= 0 || price >= 1) return "—";
-
   return Math.round(price * 100) + "¢";
-
 }
-
 function decimalText(price) {
-
   if (!Number.isFinite(price) || price <= 0 || price >= 1) return "—";
-
   return (1 / price).toFixed(2);
-
 }
 
+/*
+ * Worker response fields:
+ * primary market: tokens[{id,name}], clobTokenIds[], outcomes[]
+ * extra markets: fancyMarkets[{tokens[{id,name}],clobTokenIds[],outcomes[]}]
+ * HTML quote code uses tokenId/outcome internally, so normalize here.
+ */
 function getTokens(match) {
-
   const result = [];
 
-  const markets = Array.isArray(match.markets) ? match.markets : [];
+  function addMarket(market, fallbackId = "") {
+    if (!market || typeof market !== "object") return;
 
-  for (const market of markets) {
+    const sourceTokens = Array.isArray(market.tokens) ? market.tokens : [];
+    const ids = Array.isArray(market.clobTokenIds) ? market.clobTokenIds : [];
+    const outcomes = Array.isArray(market.outcomes) ? market.outcomes : [];
 
-    for (const token of (market.tokens || [])) {
+    if (sourceTokens.length) {
+      sourceTokens.forEach((token,index) => {
+        const tokenId = token?.tokenId || token?.id || ids[index];
+        if (!tokenId) return;
+        result.push({
+          tokenId:String(tokenId),
+          outcome:String(token?.outcome || token?.name || outcomes[index] || "Outcome"),
+          marketId:String(market.id || fallbackId || ""),
+          marketQuestion:String(market.question || market.marketQuestion || "Market"),
+          volume:safeNumber(market.volume) ?? 0
+        });
+      });
+      return;
+    }
 
-      if (!token.tokenId) continue;
-
+    ids.forEach((id,index) => {
+      if (!id) return;
       result.push({
-
-        tokenId:String(token.tokenId),
-
-        outcome:String(token.outcome || "Outcome"),
-
-        marketId:String(market.id || ""),
-
-        marketQuestion:String(market.question || "Market"),
-
+        tokenId:String(id),
+        outcome:String(outcomes[index] || "Outcome"),
+        marketId:String(market.id || fallbackId || ""),
+        marketQuestion:String(market.question || market.marketQuestion || "Market"),
         volume:safeNumber(market.volume) ?? 0
-
       });
-
-    }
-
+    });
   }
 
-  // Older event records may expose only event.tokens.
+  addMarket({
+    id:match.marketId,
+    question:match.marketQuestion,
+    tokens:match.tokens,
+    clobTokenIds:match.clobTokenIds,
+    outcomes:match.outcomes,
+    volume:match.volume
+  });
 
-  if (!result.length && Array.isArray(match.tokens)) {
-
-    for (const token of match.tokens) {
-
-      if (!token.tokenId) continue;
-
-      result.push({
-
-        tokenId:String(token.tokenId),
-
-        outcome:String(token.outcome || "Outcome"),
-
-        marketId:String(token.marketId || ""),
-
-        marketQuestion:String(token.marketQuestion || "Market"),
-
-        volume:safeNumber(token.volume) ?? 0
-
-      });
-
-    }
-
+  if (Array.isArray(match.fancyMarkets)) {
+    for (const market of match.fancyMarkets) addMarket(market);
   }
 
-  return result;
+  // Backward compatibility with a nested markets[] response.
+  if (Array.isArray(match.markets)) {
+    for (const market of match.markets) addMarket(market);
+  }
 
+  const unique = new Map();
+  for (const token of result) {
+    if (!unique.has(token.tokenId)) unique.set(token.tokenId,token);
+  }
+  return [...unique.values()];
 }
 
 function updateTokenRegistry() {
-
   const next = new Map();
-
   for (const match of state.matches) {
-
     for (const token of getTokens(match)) {
-
-      if (!next.has(token.tokenId)) next.set(token.tokenId, token);
-
+      if (!next.has(token.tokenId)) next.set(token.tokenId,token);
     }
-
   }
-
-  state.tokens = new Map([...next.entries()].slice(0, MAX_TOKENS));
-
+  state.tokens = new Map([...next.entries()].slice(0,MAX_TOKENS));
   $("tokencount").textContent = String(state.tokens.size);
-
 }
 
 async function fetchMatches() {
-
   const started = performance.now();
-
   state.requestAt = Date.now();
-
   $("error").style.display = "none";
 
   const params = new URLSearchParams({
-
-    sport: state.sport,
-
-    day: "all",
-
-    limit: "100",
-
-    offset: "0"
-
+    sport:state.sport,
+    day:"all",
+    limit:"100",
+    offset:"0"
   });
-
-  if (state.search.trim()) params.set("q", state.search.trim());
+  if (state.search.trim()) params.set("q",state.search.trim());
 
   try {
-
-    const response = await fetch(`${WORKER}/matches?${params}`, {
-
-      method:"GET",
-
-      cache:"no-store"
-
+    const response = await fetch(`${WORKER}/matches?${params}`,{
+      method:"GET",cache:"no-store"
     });
-
     const payload = await response.json();
-
     state.apiMs = performance.now() - started;
-
     if (!response.ok || payload.success === false) {
-
       throw new Error(payload.error || `Worker HTTP ${response.status}`);
-
     }
 
     const rows = Array.isArray(payload.data)
-
       ? payload.data
-
       : Array.isArray(payload.matches) ? payload.matches : [];
 
     state.matches = rows.filter(m =>
-
-      ["cricket","tennis","football"].includes(String(m.sport || "").toLowerCase())
-
+      ["cricket","tennis","soccer","football"].includes(String(m.sport || "").toLowerCase())
     );
 
     updateTokenRegistry();
-
     connectMarketSocket();
-
     render();
 
     state.renderAt = Date.now();
-
-    $("lastupdate").textContent = new Date().toLocaleTimeString([], {
-
+    $("lastupdate").textContent = new Date().toLocaleTimeString([],{
       hour:"2-digit",minute:"2-digit",second:"2-digit"
-
     });
-
-    $("latency").textContent = `API ${Math.round(state.apiMs)}ms · WS ${state.wsConnected ? "ON" : "—"}`;
-
+    $("latency").textContent =
+      `API ${Math.round(state.apiMs)}ms · WS ${state.wsConnected ? "ON" : "—"}`;
     $("diagnostics").textContent =
-
       `Worker ${payload.worker || "unknown"} · received ${state.matches.length} events · ` +
-
-      `request-to-render ${state.requestAt ? state.renderAt - state.requestAt : "—"}ms`;
+      `registered ${state.tokens.size} tokens · request-to-render ${state.renderAt-state.requestAt}ms`;
 
   } catch (error) {
-
     $("error").style.display = "block";
-
     $("error").textContent = "Worker error: " + String(error.message || error);
-
     $("summary").textContent = "Could not load matches.";
-
     if (!state.matches.length) {
-
-      $("cards").innerHTML = `<div class="empty">Could not load Polymarket matches.<br>${escapeHTML(error.message || error)}</div>`;
-
+      $("cards").innerHTML =
+        `<div class="empty">Could not load Polymarket matches.<br>${escapeHTML(error.message || error)}</div>`;
     }
-
   }
-
 }
 
 function connectMarketSocket() {
-
   const ids = [...state.tokens.keys()];
-
   if (!ids.length) {
-
-    setWSStatus(false, "WS NO TOKENS");
-
+    closeSocket();
+    setWSStatus(false,"WS NO TOKENS");
     return;
-
   }
-
-  // Reuse existing socket if subscription set has not changed.
 
   const signature = ids.join(",");
-
   if (state.ws && state.wsSignature === signature &&
-
-      (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) {
-
-    return;
-
-  }
+      (state.ws.readyState === WebSocket.OPEN ||
+       state.ws.readyState === WebSocket.CONNECTING)) return;
 
   closeSocket();
-
   state.wsSignature = signature;
-
   const generation = ++state.wsGeneration;
 
   try {
-
     const ws = new WebSocket(CLOB_WS);
-
     state.ws = ws;
-
-    setWSStatus(false, "WS CONNECTING");
+    setWSStatus(false,"WS CONNECTING");
 
     ws.onopen = () => {
-
       if (generation !== state.wsGeneration) return;
-
       state.wsConnected = true;
-
       state.wsOpenedAt = Date.now();
-
-      setWSStatus(true, "WS CONNECTED");
+      setWSStatus(true,"WS CONNECTED");
 
       const currentIds = [...state.tokens.keys()];
-
-      // Keep each subscription within a reasonable message size.
-
-      for (let i = 0; i < currentIds.length; i += 100) {
-
+      for (let i=0;i<currentIds.length;i+=100) {
         ws.send(JSON.stringify({
-
           type:"market",
-
-          assets_ids:currentIds.slice(i, i + 100)
-
+          assets_ids:currentIds.slice(i,i+100)
         }));
-
       }
-
       $("diagnostics").textContent =
-
         `Market WebSocket connected · subscribed ${currentIds.length} token IDs`;
-
     };
 
     ws.onmessage = event => {
-
       if (generation !== state.wsGeneration) return;
-
       state.packets++;
-
       state.lastPacketAt = Date.now();
-
       $("packets").textContent = String(state.packets);
 
       let message;
-
-      try {
-
-        message = JSON.parse(event.data);
-
-      } catch {
-
-        return;
-
-      }
+      try { message = JSON.parse(event.data); }
+      catch { return; }
 
       const messages = Array.isArray(message) ? message : [message];
-
       for (const item of messages) processMarketMessage(item);
-
       renderQuotesOnly();
-
     };
 
     ws.onerror = () => {
-
-      if (generation === state.wsGeneration) setWSStatus(false, "WS ERROR");
-
+      if (generation === state.wsGeneration) setWSStatus(false,"WS ERROR");
     };
 
     ws.onclose = () => {
-
       if (generation !== state.wsGeneration) return;
-
       state.wsConnected = false;
-
-      setWSStatus(false, "WS CLOSED");
-
-      state.reconnectTimer = setTimeout(connectMarketSocket, 2500);
-
+      setWSStatus(false,"WS CLOSED");
+      state.reconnectTimer = setTimeout(connectMarketSocket,2500);
     };
-
   } catch (error) {
-
-    setWSStatus(false, "WS ERROR");
-
+    setWSStatus(false,"WS ERROR");
     $("diagnostics").textContent = "WebSocket error: " + String(error.message || error);
-
   }
-
 }
 
 function closeSocket() {
-
   if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
-
   state.reconnectTimer = null;
-
+  state.wsGeneration++;
   if (state.ws) {
-
     const old = state.ws;
-
     state.ws = null;
-
-    try {
-
-      old.onclose = null;
-
-      old.close();
-
-    } catch {}
-
+    try { old.onclose = null; old.close(); } catch {}
   }
-
   state.wsConnected = false;
-
 }
 
-function setWSStatus(ok, label) {
-
+function setWSStatus(ok,label) {
   $("wsstatus").textContent = label;
-
   $("wsdot").className = "dot " + (ok ? "ok" : "bad");
-
   state.wsConnected = ok;
-
-  $("latency").textContent = `API ${state.apiMs == null ? "—" : Math.round(state.apiMs) + "ms"} · WS ${ok ? "ON" : "—"}`;
-
+  $("latency").textContent =
+    `API ${state.apiMs == null ? "—" : Math.round(state.apiMs)+"ms"} · WS ${ok ? "ON" : "—"}`;
 }
 
 function validQuotePrice(value) {
-
   const n = Number(value);
-
   return Number.isFinite(n) && n > 0 && n < 1 ? n : null;
-
-}
-
-function setQuote(tokenId, update) {
-
-  if (!tokenId) return;
-
-  const old = state.quotes.get(String(tokenId)) || {
-
-    bestBid:null,bestAsk:null,updatedAt:0
-
-  };
-
-  const next = {...old};
-
-  const bid = validQuotePrice(update.bestBid);
-
-  const ask = validQuotePrice(update.bestAsk);
-
-  if (bid !== null) next.bestBid = bid;
-
-  if (ask !== null) next.bestAsk = ask;
-
-  next.updatedAt = Date.now();
-
-  state.quotes.set(String(tokenId), next);
-
 }
 
 function processMarketMessage(message) {
-
   if (!message || typeof message !== "object") return;
-
   const type = String(message.event_type || message.type || "").toLowerCase();
 
   if (type === "book" || (Array.isArray(message.bids) && Array.isArray(message.asks))) {
-
     const tokenId = String(message.asset_id || message.assetId || "");
-
     if (!tokenId) return;
-
     const bids = Array.isArray(message.bids) ? message.bids : [];
-
     const asks = Array.isArray(message.asks) ? message.asks : [];
-
-    const bidPrices = bids.map(x => Number(x.price)).filter(x => Number.isFinite(x) && x > 0 && x < 1);
-
-    const askPrices = asks.map(x => Number(x.price)).filter(x => Number.isFinite(x) && x > 0 && x < 1);
-
-    state.quotes.set(tokenId, {
-
-      bestBid:bidPrices.length ? Math.max(...bidPrices) : null,
-
-      bestAsk:askPrices.length ? Math.min(...askPrices) : null,
-
+    const bidPrices = bids.map(x=>Number(x.price)).filter(x=>Number.isFinite(x)&&x>0&&x<1);
+    const askPrices = asks.map(x=>Number(x.price)).filter(x=>Number.isFinite(x)&&x>0&&x<1);
+    state.quotes.set(tokenId,{
+      bestBid:bidPrices.length?Math.max(...bidPrices):null,
+      bestAsk:askPrices.length?Math.min(...askPrices):null,
       updatedAt:Date.now()
-
     });
-
     return;
-
   }
 
   if (type === "price_change" || Array.isArray(message.price_changes)) {
-
     const changes = Array.isArray(message.price_changes) ? message.price_changes : [];
-
     for (const change of changes) {
-
       const tokenId = String(change.asset_id || change.assetId || "");
-
       if (!tokenId) continue;
-
-      const old = state.quotes.get(tokenId) || {
-
-        bestBid:null,bestAsk:null,updatedAt:0
-
-      };
-
+      const old = state.quotes.get(tokenId) || {bestBid:null,bestAsk:null,updatedAt:0};
       const bid = validQuotePrice(change.best_bid ?? change.bestBid);
-
       const ask = validQuotePrice(change.best_ask ?? change.bestAsk);
-
-      state.quotes.set(tokenId, {
-
-        bestBid:bid !== null ? bid : old.bestBid,
-
-        bestAsk:ask !== null ? ask : old.bestAsk,
-
+      state.quotes.set(tokenId,{
+        bestBid:bid!==null?bid:old.bestBid,
+        bestAsk:ask!==null?ask:old.bestAsk,
         updatedAt:Date.now()
-
       });
-
     }
-
-    return;
-
   }
-
-  // Trade events are not treated as best bid/ask.
-
 }
 
 function matchesForView() {
-
   const now = Date.now();
-
   const today = istKey(new Date());
-
-  const tomorrow = istKey(new Date(now + 24 * 60 * 60 * 1000));
+  const tomorrow = istKey(new Date(now+24*60*60*1000));
 
   return state.matches.filter(match => {
+    const matchSport = String(match.sport || "").toLowerCase();
+    if (state.sport !== "all" &&
+        !(state.sport === "football" ? matchSport === "soccer" || matchSport === "football" : matchSport === state.sport)) return false;
 
-    if (state.sport !== "all" && match.sport !== state.sport) return false;
-
-    const date = parseDate(match.scheduledAt);
-
+    const date = parseDate(match.scheduledAt || match.startDate);
     const matchDay = date ? istKey(date) : "";
-
     if (state.day === "live" && match.live !== true && match.isLive !== true) return false;
-
     if (state.day === "today" && matchDay !== today) return false;
-
     if (state.day === "tomorrow" && matchDay !== tomorrow) return false;
-
-    if (state.day === "upcoming" && (!date || date.getTime() < now || match.live === true)) return false;
-
+    if (state.day === "upcoming" && (!date || date.getTime()<now || match.live===true)) return false;
     return true;
-
   });
-
 }
 
 function quoteHTML(tokenId) {
-
   const quote = state.quotes.get(tokenId);
-
   const ask = quote ? quote.bestAsk : null;
-
   const bid = quote ? quote.bestBid : null;
-
-  const age = quote && quote.updatedAt ? Math.max(0, Date.now() - quote.updatedAt) : null;
+  const age = quote && quote.updatedAt ? Math.max(0,Date.now()-quote.updatedAt) : null;
 
   return `
-
     <div class="quotegrid">
-
-      <div class="quote">
-
-        <div class="qlabel">BACK · Buy ask</div>
-
-        <div class="price">${priceText(ask)}</div>
-
-        <div class="decimal">Decimal ${decimalText(ask)}</div>
-
-      </div>
-
-      <div class="quote">
-
-        <div class="qlabel">LAY · Sell bid</div>
-
-        <div class="price">${priceText(bid)}</div>
-
-        <div class="decimal">Decimal ${decimalText(bid)}</div>
-
-      </div>
-
+      <div class="quote"><div class="qlabel">BACK · Buy ask</div><div class="price">${priceText(ask)}</div><div class="decimal">Decimal ${decimalText(ask)}</div></div>
+      <div class="quote"><div class="qlabel">LAY · Sell bid</div><div class="price">${priceText(bid)}</div><div class="decimal">Decimal ${decimalText(bid)}</div></div>
     </div>
-
-    <div class="nodata">${age == null ? "Waiting for order-book quote" : `Quote update ${age < 1000 ? age + "ms" : (age / 1000).toFixed(1) + "s"} ago`}</div>
-
+    <div class="nodata">${age==null?"Waiting for order-book quote":`Quote update ${age<1000?age+"ms":(age/1000).toFixed(1)+"s"} ago`}</div>
   `;
-
 }
 
 function cardHTML(match) {
-
   const allTokens = getTokens(match);
-
-  const markets = Array.isArray(match.markets) ? match.markets : [];
-
-  // Show first market with two available outcomes; modal exposes all returned markets.
-
-  let chosenMarket = markets.find(m => (m.tokens || []).length >= 2);
-
-  let tokens = chosenMarket ? chosenMarket.tokens : allTokens.slice(0, 2);
-
+  const primaryTokens = allTokens.filter(t =>
+    t.marketId === String(match.marketId || "")
+  );
+  const tokens = (primaryTokens.length ? primaryTokens : allTokens).slice(0,2);
   const title = match.title || "Untitled match";
-
-  const sport = String(match.sport || "").toUpperCase();
-
-  const volume = safeNumber(chosenMarket?.volume ?? match.volume);
-
-  const outcomesHTML = tokens.slice(0, 2).map(token => `
-
+  const rawSport = String(match.sport || "").toLowerCase();
+  const sport = rawSport === "soccer" ? "FOOTBALL" : rawSport.toUpperCase();
+  const volume = safeNumber(match.volume);
+  const outcomesHTML = tokens.map(token => `
     <div class="outcome">
-
       <div class="outname" title="${escapeHTML(token.outcome)}">${escapeHTML(token.outcome)}</div>
-
-      ${quoteHTML(String(token.tokenId))}
-
+      ${quoteHTML(token.tokenId)}
     </div>
-
   `).join("");
-
   const live = match.live === true || match.isLive === true;
-
-  const marketLabel = chosenMarket?.question || "Match market";
+  const marketLabel = match.marketQuestion || "Match market";
 
   return `
-
     <article class="card">
-
       <div class="cardhead">
-
-        <div>
-
-          <div class="matchtitle">${escapeHTML(title)}</div>
-
-          <div class="meta">${escapeHTML(sport)} · ${escapeHTML(formatDate(match.scheduledAt))}</div>
-
-        </div>
-
-        <span class="liveflag">${live ? '<span class="dot ok"></span>LIVE' : 'MATCH'}</span>
-
+        <div><div class="matchtitle">${escapeHTML(title)}</div>
+        <div class="meta">${escapeHTML(sport)} · ${escapeHTML(formatDate(match.scheduledAt || match.startDate))}</div></div>
+        <span class="liveflag">${live?'<span class="dot ok"></span>LIVE':'MATCH'}</span>
       </div>
-
-      <div class="marketrow">
-
-        <div class="marketname">${escapeHTML(marketLabel)}</div>
-
-        <div class="marketvolume">Vol ${money(volume)}</div>
-
-      </div>
-
-      ${outcomesHTML ? `<div class="outcomes">${outcomesHTML}</div>` : `<div class="nodata">No token outcomes returned by Worker.</div>`}
-
+      <div class="marketrow"><div class="marketname">${escapeHTML(marketLabel)}</div><div class="marketvolume">Vol ${money(volume)}</div></div>
+      ${outcomesHTML?`<div class="outcomes">${outcomesHTML}</div>`:`<div class="nodata">No token outcomes returned by Worker.</div>`}
       <div class="cardfoot">
-
-        <span class="small">${allTokens.length} tokens · ${Number(match.marketCount || markets.length || 0)} markets</span>
-
+        <span class="small">${allTokens.length} tokens · ${Number(match.marketCount || match.markets?.length || 0)} markets</span>
         <div style="display:flex;gap:12px;align-items:center">
-
           <button class="textlink" data-markets="${escapeHTML(match.id)}">All markets</button>
-
-          ${match.url ? `<a class="textlink" href="${escapeHTML(match.url)}" target="_blank" rel="noopener noreferrer" style="color:#111">Polymarket ↗</a>` : ""}
-
+          ${match.eventUrl?`<a class="textlink" href="${escapeHTML(match.eventUrl)}" target="_blank" rel="noopener noreferrer" style="color:#111">Polymarket ↗</a>`:""}
         </div>
-
       </div>
-
     </article>
-
   `;
-
 }
 
 function render() {
-
   const rows = matchesForView();
-
   $("matchcount").textContent = String(rows.length);
-
   $("summary").textContent = `${rows.length} matches · ${state.day.toUpperCase()} · ${state.sport.toUpperCase()}`;
-
   if (!rows.length) {
-
     $("cards").innerHTML = `<div class="empty">No matches found for this filter.<br>Try another sport, day, or search.</div>`;
-
     return;
-
   }
-
   $("cards").innerHTML = rows.map(cardHTML).join("");
-
-  $("renderedAt")?.remove();
-
 }
 
 function renderQuotesOnly() {
-
-  // Re-render only when quote packets arrive; match discovery is on a slower timer.
-
   render();
-
   if (state.lastPacketAt) {
-
     $("diagnostics").textContent =
-
-      `Packets ${state.packets} · last packet ${Date.now() - state.lastPacketAt}ms ago · ` +
-
-      `API ${state.apiMs == null ? "—" : Math.round(state.apiMs) + "ms"}`;
-
+      `Packets ${state.packets} · last packet ${Date.now()-state.lastPacketAt}ms ago · API ${state.apiMs==null?"—":Math.round(state.apiMs)+"ms"}`;
   }
-
 }
 
 function openMarkets(matchId) {
-
-  const match = state.matches.find(m => String(m.id) === String(matchId));
-
+  const match = state.matches.find(m=>String(m.id)===String(matchId));
   if (!match) return;
-
   state.modalMatch = match;
-
   $("sheettitle").textContent = match.title || "Available markets";
 
-  const markets = (Array.isArray(match.markets) ? match.markets : [])
+  const markets = [{
+    id:match.marketId,
+    question:match.marketQuestion,
+    tokens:match.tokens,
+    clobTokenIds:match.clobTokenIds,
+    outcomes:match.outcomes,
+    volume:match.volume
+  }];
+  if (Array.isArray(match.fancyMarkets)) markets.push(...match.fancyMarkets);
+  if (Array.isArray(match.markets)) markets.push(...match.markets);
 
-    .filter(m => Array.isArray(m.tokens) && m.tokens.length > 0);
-
-  if (!markets.length) {
-
-    $("marketlist").innerHTML = `<div class="empty">Worker returned no market categories for this event.</div>`;
-
-  } else {
-
-    $("marketlist").innerHTML = markets.map(m => {
-
-      const outcomes = m.tokens.map(t => t.outcome).join(" · ");
-
-      return `
-
-        <div class="marketitem">
-
-          <strong>${escapeHTML(m.question || "Market")}</strong>
-
-          <div class="small">${escapeHTML(outcomes || "Outcomes unavailable")}</div>
-
-          <div class="small">Volume ${money(safeNumber(m.volume) ?? 0)} · ${m.tokens.length} tokens</div>
-
-        </div>
-
-      `;
-
-    }).join("");
-
+  const unique = new Map();
+  for (const market of markets) {
+    const normalized = getTokens({
+      marketId:market.id,
+      marketQuestion:market.question,
+      tokens:market.tokens,
+      clobTokenIds:market.clobTokenIds,
+      outcomes:market.outcomes,
+      volume:market.volume
+    });
+    if (normalized.length && !unique.has(String(market.id || market.question))) {
+      unique.set(String(market.id || market.question),{market,tokens:normalized});
+    }
   }
 
+  const validMarkets = [...unique.values()];
+  if (!validMarkets.length) {
+    $("marketlist").innerHTML = `<div class="empty">Worker returned no market categories for this event.</div>`;
+  } else {
+    $("marketlist").innerHTML = validMarkets.map(({market,tokens})=>`
+      <div class="marketitem">
+        <strong>${escapeHTML(market.question || "Market")}</strong>
+        <div class="small">${escapeHTML(tokens.map(t=>t.outcome).join(" · "))}</div>
+        <div class="small">Volume ${money(safeNumber(market.volume)??0)} · ${tokens.length} tokens</div>
+      </div>
+    `).join("");
+  }
   $("modal").classList.add("show");
-
 }
 
-$("cards").addEventListener("click", event => {
-
+$("cards").addEventListener("click",event=>{
   const button = event.target.closest("[data-markets]");
-
   if (button) openMarkets(button.dataset.markets);
-
 });
-
-$("closemodal").addEventListener("click", () => $("modal").classList.remove("show"));
-
-$("modal").addEventListener("click", event => {
-
+$("closemodal").addEventListener("click",()=>$("modal").classList.remove("show"));
+$("modal").addEventListener("click",event=>{
   if (event.target === $("modal")) $("modal").classList.remove("show");
-
 });
-
-$("sports").addEventListener("click", event => {
-
+$("sports").addEventListener("click",event=>{
   const button = event.target.closest("[data-sport]");
-
   if (!button) return;
-
   state.sport = button.dataset.sport;
-
-  document.querySelectorAll("[data-sport]").forEach(b =>
-
-    b.classList.toggle("activebtn", b === button)
-
-  );
-
+  document.querySelectorAll("[data-sport]").forEach(b=>b.classList.toggle("activebtn",b===button));
   fetchMatches();
-
 });
-
-$("filters").addEventListener("click", event => {
-
+$("filters").addEventListener("click",event=>{
   const button = event.target.closest("[data-day]");
-
   if (!button) return;
-
   state.day = button.dataset.day;
-
-  document.querySelectorAll("[data-day]").forEach(b =>
-
-    b.classList.toggle("activebtn", b === button)
-
-  );
-
+  document.querySelectorAll("[data-day]").forEach(b=>b.classList.toggle("activebtn",b===button));
   render();
-
 });
-
-$("search").addEventListener("input", () => {
-
+$("search").addEventListener("input",()=>{
   state.search = $("search").value.trim();
-
   clearTimeout(state.searchTimer);
-
-  state.searchTimer = setTimeout(fetchMatches, 350);
-
+  state.searchTimer = setTimeout(fetchMatches,350);
 });
-
-$("clearsearch").addEventListener("click", () => {
-
+$("clearsearch").addEventListener("click",()=>{
   $("search").value = "";
-
   state.search = "";
-
   fetchMatches();
-
 });
-
-$("refresh").addEventListener("click", fetchMatches);
-
-document.addEventListener("visibilitychange", () => {
-
+$("refresh").addEventListener("click",fetchMatches);
+document.addEventListener("visibilitychange",()=>{
   if (!document.hidden) {
-
     fetchMatches();
-
     if (!state.ws || state.ws.readyState === WebSocket.CLOSED) connectMarketSocket();
-
   }
-
 });
 
 fetchMatches();
-
-state.timer = setInterval(fetchMatches, REFRESH_MS);
-
+state.timer = setInterval(fetchMatches,REFRESH_MS);
 })();
-
 </script>
-
 </body>
-
 </html>
