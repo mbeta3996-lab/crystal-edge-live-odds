@@ -19,7 +19,7 @@ const MAX_MESSAGE = 65536;
 // IMPORTANT:
 // Use the same key in the dashboard HTML and website userscript.
 // Replace this placeholder before exposing the tunnel.
-const BRIDGE_KEY = "CHANGE_THIS_TO_A_LONG_RANDOM_SECRET";
+const BRIDGE_KEY = process.env.BRIDGE_TOKEN || "";
 
 // Dashboard and Polymarket website origins.
 const ALLOWED_ORIGINS = new Set([
