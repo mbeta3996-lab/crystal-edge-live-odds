@@ -312,8 +312,13 @@ const state={
 
 };
 
-const $=id=>document.getElementById(id);
 
+ const $=id=>document.getElementById(id);
+const num = v => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 const escapeHTML=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 const toArray=v=>{
