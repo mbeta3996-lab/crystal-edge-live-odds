@@ -95,6 +95,19 @@ const $ = id => document.getElementById(id);
 function arr(v){if(Array.isArray(v))return v;if(typeof v==="string"){try{const x=JSON.parse(v);return Array.isArray(x)?x:[]}catch{}}return []}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function time(ms,tz){if(!ms)return "—";return new Intl.DateTimeFormat("en-GB",{timeZone:tz,day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(new Date(ms))}
+function timeAmsterdam(ms){
+ if(!ms)return "—";
+ return new Intl.DateTimeFormat("en-GB",{
+  timeZone:"Europe/Amsterdam",
+  day:"2-digit",
+  month:"2-digit",
+  year:"numeric",
+  hour:"2-digit",
+  minute:"2-digit",
+  second:"2-digit",
+  hour12:false
+ }).format(new Date(ms));
+}
 function cents(v){const n=Number(v);return Number.isFinite(n)&&n>0?(n*100).toFixed(1)+"¢":"—"}
 function decimal(v){const n=Number(v);return Number.isFinite(n)&&n>0?(1/n).toFixed(2):"—"}
 function isTodayIST(value){
@@ -124,11 +137,29 @@ function subscribeTokens(){
  $("tokenCount").textContent=state.tokens.size;
 }
 function processQuote(msg){
- const id=String(msg.asset_id||msg.assetId||msg.token_id||"");if(!id)return;
- const meta=state.tokenMeta.get(id),bid=Number(msg.best_bid),ask=Number(msg.best_ask);
- const quote={bestBid:Number.isFinite(bid)&&bid>0?bid:null,bestAsk:Number.isFinite(ask)&&ask>0?ask:null,receivedAt:Number(msg.receivedAt||Date.now())};
+ const id=String(msg.asset_id||msg.assetId||msg.token_id||"");
+ if(!id)return;
+
+ const meta=state.tokenMeta.get(id);
+ const bid=Number(msg.best_bid),ask=Number(msg.best_ask);
+
+ const quote={
+  bestBid:Number.isFinite(bid)&&bid>0?bid:null,
+  bestAsk:Number.isFinite(ask)&&ask>0?ask:null,
+  receivedAt:Number(msg.receivedAt||Date.now())
+ };
+
  state.quotes.set(id,quote);
- if(meta){const key=meta.matchSlug+"|"+meta.marketId+"|"+meta.outcome;state.lastVps={key,at:quote.receivedAt};pairUpdate(key,"vps",quote.receivedAt)}
+
+ // Direct VPS update in Amsterdam local time.
+ $("vpsTime").textContent=timeAmsterdam(quote.receivedAt);
+
+ if(meta){
+  const key=meta.matchSlug+"|"+meta.marketId+"|"+meta.outcome;
+  state.lastVps={key,at:quote.receivedAt};
+  pairUpdate(key,"vps",quote.receivedAt);
+ }
+
  render();
 }
 function processWebsite(p){
