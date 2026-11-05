@@ -152,7 +152,7 @@ function processQuote(msg){
  state.quotes.set(id,quote);
 
  // Direct VPS update in Amsterdam local time.
- $("vpsTime").textContent=timeAmsterdam(quote.receivedAt);
+$("vpsTime").textContent=timeAmsterdam(pair.vps.at);
 
  if(meta){
   const key=meta.matchSlug+"|"+meta.marketId+"|"+meta.outcome;
